@@ -1,0 +1,43 @@
+{
+  "name": "Aldric Stonehammer",
+  "race": "Dwarf",
+  "class": "Fighter",
+  "subclass": "Battle Master",
+  "level": 5,
+  "background": "Soldier",
+  "alignment": "Lawful Good",
+  "stats": {
+    "STR": 18,
+    "DEX": 10,
+    "CON": 16,
+    "INT": 10,
+    "WIS": 12,
+    "CHA": 8
+  },
+  "hp": {
+    "max": 52,
+    "current": 52
+  },
+  "ac": 18,
+  "speed": 25,
+  "proficiency_bonus": 3,
+  "saving_throws": {
+    "STR": true,
+    "CON": true
+  },
+  "skills": {
+    "Athletics": true,
+    "Intimidation": true,
+    "Perception": false,
+    "Survival": true
+  },
+  "equipment": [
+    "Warhammer",
+    "Shield",
+    "Chain Mail",
+    "Handaxe x2",
+    "Explorer's Pack"
+  ],
+  "gold": 45,
+  "languages": ["Common", "Dwarvish"]
+}

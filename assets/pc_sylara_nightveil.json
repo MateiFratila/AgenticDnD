@@ -1,0 +1,62 @@
+{
+  "name": "Sylara Nightveil",
+  "race": "Half-Elf",
+  "class": "Wizard",
+  "subclass": "School of Divination",
+  "level": 5,
+  "background": "Sage",
+  "alignment": "Neutral Good",
+  "stats": {
+    "STR": 8,
+    "DEX": 14,
+    "CON": 12,
+    "INT": 18,
+    "WIS": 13,
+    "CHA": 14
+  },
+  "hp": {
+    "max": 30,
+    "current": 30
+  },
+  "ac": 13,
+  "speed": 30,
+  "proficiency_bonus": 3,
+  "saving_throws": {
+    "INT": true,
+    "WIS": true
+  },
+  "skills": {
+    "Arcana": true,
+    "History": true,
+    "Investigation": true,
+    "Insight": false,
+    "Perception": true
+  },
+  "spellcasting": {
+    "ability": "INT",
+    "spell_save_dc": 15,
+    "spell_attack_bonus": 7,
+    "slots": {
+      "1st": 4,
+      "2nd": 3,
+      "3rd": 2
+    },
+    "prepared_spells": [
+      "Magic Missile",
+      "Shield",
+      "Misty Step",
+      "Counterspell",
+      "Fireball",
+      "See Invisibility"
+    ]
+  },
+  "equipment": [
+    "Spellbook",
+    "Quarterstaff",
+    "Component Pouch",
+    "Arcane Focus (Crystal)",
+    "Scholar's Pack"
+  ],
+  "gold": 120,
+  "languages": ["Common", "Elvish", "Draconic", "Celestial"]
+}

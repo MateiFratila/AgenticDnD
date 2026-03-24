@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "description": "House rules and deviations from D&D 5e RAW used in this simulation.",
+  "rules": {
+    "critical_hits": {
+      "rule": "Maximum damage on first die, roll second",
+      "description": "On a critical hit, the first damage die is maximized and only the additional die is rolled, instead of rolling all dice twice.",
+      "replaces": "PHB p.196 — roll all dice twice on a crit"
+    },
+    "death_saving_throws": {
+      "rule": "Allies can stabilize with a Medicine check (DC 12)",
+      "description": "An adjacent ally can use their action to make a DC 12 Wisdom (Medicine) check to stabilize a downed creature, instead of requiring a healer's kit.",
+      "replaces": "PHB p.197 — healer's kit required to automatically stabilize"
+    },
+    "flanking": {
+      "rule": "Flanking grants +2 to attack rolls (not advantage)",
+      "description": "When two allies have a creature directly between them, each gains +2 to melee attack rolls against that creature instead of advantage, to reduce the dominance of advantage stacking.",
+      "replaces": "DMG optional flanking rule — grants advantage"
+    },
+    "short_rest": {
+      "rule": "Short rest duration is 10 minutes",
+      "description": "Short rests take 10 minutes instead of 1 hour to make them more practical in dungeon crawl scenarios.",
+      "replaces": "PHB p.186 — short rest is 1 hour"
+    },
+    "potions": {
+      "rule": "Potions can be drunk as a bonus action",
+      "description": "Drinking a potion yourself costs a bonus action. Administering a potion to another creature still costs an action.",
+      "replaces": "PHB — drinking a potion costs an action"
+    },
+    "ability_checks": {
+      "rule": "Ties on contested checks go to the initiating character",
+      "description": "When a contested ability check results in a tie, the character who initiated the action succeeds.",
+      "replaces": "PHB p.174 — ties go to the defender"
+    },
+    "inspiration": {
+      "rule": "Inspiration can be spent after seeing the roll result",
+      "description": "Players may choose to spend Inspiration to reroll after seeing the result of a d20, but before the outcome is narrated.",
+      "replaces": "PHB — Inspiration declared before the roll"
+    }
+  }
+}

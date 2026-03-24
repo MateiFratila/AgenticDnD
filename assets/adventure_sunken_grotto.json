@@ -1,0 +1,301 @@
+{
+  "version": "1.0",
+  "title": "The Sunken Grotto of Grell's Hoard",
+  "theme": "Kobold den with goblin mercenaries and ancient artifact",
+  "difficulty": "Medium (5 encounters over 2-3 sessions)",
+  "recommended_party_level": 5,
+  "background": "Local merchant caravan was ambushed. Survivors report a blue gemstone taken. A scholar recognizes it as a potential Shard of Kaelas (an ancient artifact). The PCs are hired to recover it and eliminate the threat.",
+  
+  "objectives": [
+    {
+      "id": "primary",
+      "goal": "Recover the Shard of Kaelas",
+      "description": "The gemstone must be taken from Grell's lair and returned intact",
+      "success_condition": "Shard in party possession and exit grotto",
+      "failure_condition": "Shard destroyed or party eliminated"
+    },
+    {
+      "id": "secondary",
+      "goal": "Eliminate Grell",
+      "description": "Destroy or drive out the kobold warlord. Optional but recommended to prevent future attacks.",
+      "success_condition": "Grell killed or fled permanently",
+      "failure_condition": "Party retreats without confronting Grell"
+    },
+    {
+      "id": "tertiary",
+      "goal": "Discover the goblin connection",
+      "description": "Learn who hired the goblins as mercenaries. Investigation opportunity.",
+      "success_condition": "Party discovers the identity of the employer",
+      "failure_condition": "Employer remains unknown"
+    }
+  ],
+
+  "map": {
+    "entrance": {
+      "room_id": "entrance",
+      "name": "Grotto Mouth",
+      "description_cues": "Damp cave opening, recent drag marks, smell of sulfur and copper",
+      "layout": "20 ft wide, sloping downward",
+      "connections": [
+        {"direction": "north", "destination": "goblin_barracks", "blocked_by": null}
+      ],
+      "encounters": [],
+      "hazards": []
+    },
+    "goblin_barracks": {
+      "room_id": "goblin_barracks",
+      "name": "Barracks",
+      "description_cues": "Ramshackle tents and bedrolls, crude weapons racks, gambling table with coins scattered",
+      "layout": "30 ft × 20 ft, 10 ft ceiling",
+      "connections": [
+        {"direction": "south", "destination": "entrance", "blocked_by": null},
+        {"direction": "east", "destination": "main_hall", "blocked_by": null}
+      ],
+      "encounters": [
+        {
+          "id": "encounter_1",
+          "name": "Goblin Sentries (easy)",
+          "enemies": [
+            {"type": "Goblin", "hp": 7, "ac": 15, "count": 3},
+            {"type": "Goblin Boss", "hp": 21, "ac": 16, "count": 1}
+          ],
+          "treasure": [
+            {"item": "Shortbow (common)", "count": 4},
+            {"item": "Gold", "amount": 35}
+          ],
+          "notes": "Goblins are gambling; startled by intrusion. Boss (Captain Jerk) will try to flee if below 5 HP."
+        }
+      ],
+      "hazards": []
+    },
+    "main_hall": {
+      "room_id": "main_hall",
+      "name": "Grand Hall",
+      "description_cues": "Cavernous space, pillars carved to resemble kobold heads, hearth with dying fire, skull totems",
+      "layout": "50 ft × 40 ft, 25 ft ceiling",
+      "connections": [
+        {"direction": "west", "destination": "goblin_barracks", "blocked_by": null},
+        {"direction": "north", "destination": "grell_throne", "blocked_by": null},
+        {"direction": "east", "destination": "armory", "blocked_by": null},
+        {"direction": "south", "destination": "treasury", "blocked_by": null}
+      ],
+      "encounters": [
+        {
+          "id": "encounter_2",
+          "name": "Kobold Patrol (medium)",
+          "enemies": [
+            {"type": "Kobold", "hp": 5, "ac": 12, "count": 6},
+            {"type": "Kobold Sorcerer", "hp": 27, "ac": 13, "spells": ["Magic Missile", "Burning Hands"], "count": 1}
+          ],
+          "treasure": [
+            {"item": "Gold", "amount": 50}
+          ],
+          "notes": "Alerted by barracks noise if that encounter wasn't silent. Sorcerer hangs back and casts."
+        }
+      ],
+      "hazards": [
+        {
+          "type": "Pit Trap",
+          "location": "center of hall",
+          "trigger": "Pressure plate, DC 14 Perception to spot",
+          "effect": "15 ft pit, 2d6 fall damage; can be jumped with DC 13 Athletics",
+          "disarm": "DC 12 Thieves' Tools or magic"
+        }
+      ]
+    },
+    "armory": {
+      "room_id": "armory",
+      "name": "Armory",
+      "description_cues": "Racks of javelins and clubs, broken swords, leather armor scraps, sharpening stones",
+      "layout": "25 ft × 20 ft, 12 ft ceiling",
+      "connections": [
+        {"direction": "west", "destination": "main_hall", "blocked_by": null}
+      ],
+      "encounters": [],
+      "hazards": [],
+      "treasure_unguarded": [
+        {"item": "+1 Longsword", "rarity": "uncommon"},
+        {"item": "Potion of Healing (3)", "quantity": 3},
+        {"item": "Gold", "amount": 120}
+      ]
+    },
+    "treasury": {
+      "room_id": "treasury",
+      "name": "Treasury",
+      "description_cues": "Coins stacked in corners, scattered gems, bolts of silk fabric, the Shard of Kaelas rests on an obsidian pedestal",
+      "layout": "20 ft × 30 ft, 15 ft ceiling",
+      "connections": [
+        {"direction": "north", "destination": "main_hall", "blocked_by": null}
+      ],
+      "encounters": [],
+      "hazards": [
+        {
+          "type": "Arcane Lock (glyph)",
+          "trigger": "Taking the Shard without disarming",
+          "effect": "Explodes for 4d6 force damage in 15 ft radius, DC 14 Dex save for half",
+          "disarm": "DC 15 Arcana check or dispel magic"
+        }
+      ],
+      "treasure": [
+        {"item": "Shard of Kaelas (artifact)", "description": "Blue gemstone, glows faintly in darkness"},
+        {"item": "Gold", "amount": 200},
+        {"item": "Gem", "type": "Sapphire", "value": 250},
+        {"item": "Gem", "type": "Emerald", "value": 300}
+      ]
+    },
+    "grell_throne": {
+      "room_id": "grell_throne",
+      "name": "Throne Chamber",
+      "description_cues": "Crude throne of bone and leather, tapestry of a battle scene, Grell's personal effects scattered about, faint draconic runes on walls",
+      "layout": "35 ft × 25 ft, 20 ft ceiling",
+      "connections": [
+        {"direction": "south", "destination": "main_hall", "blocked_by": null}
+      ],
+      "encounters": [
+        {
+          "id": "encounter_3",
+          "name": "Grell, the Kobold Warlord (hard)",
+          "enemies": [
+            {
+              "name": "Grell",
+              "type": "Kobold Warlord",
+              "hp": 55,
+              "ac": 15,
+              "attack": "+6 to hit, 1d8+3 greataxe",
+              "special_abilities": [
+                "Draconic Bloodline: Resistance to fire damage",
+                "Tactical Retreat: Reaction to disengage when bloodied",
+                "Call to War: Summons 2d4 Kobold reinforcements on second round (rounds 2+)"
+              ],
+              "personality": "Proud, strategic, will parley briefly but fight viciously",
+              "count": 1
+            }
+          ],
+          "allies": [
+            {"type": "Kobold Elite Guard", "hp": 22, "ac": 14, "count": 2}
+          ],
+          "treasure": [
+            {"item": "Greatsword +1", "rarity": "uncommon"},
+            {"item": "Amulet of Health", "rarity": "uncommon"},
+            {"item": "Gold", "amount": 400}
+          ],
+          "notes": "Grell fights to the death unless reduced to <10 HP, then attempts escape north through secret passage. Has knowledge of the goblin employer (Mage named Vex, details optional).",
+          "dialogue_cues": [
+            "Opener: Dismissive of PCs, confident in superiority",
+            "Bloodied: More respectful, offers parley if they're 'worthy'",
+            "Fleeing: Threats about revenge"
+          ]
+        }
+      ],
+      "hazards": [
+        {
+          "type": "Secret Door",
+          "location": "north wall, behind tapestry",
+          "trigger": "Push tapestry or find with DC 14 Perception",
+          "destination": "escape_tunnel"
+        }
+      ]
+    },
+    "escape_tunnel": {
+      "room_id": "escape_tunnel",
+      "name": "Secret Escape Tunnel",
+      "description_cues": "Narrow, roughly hewn passage, echoes of running water, leads upward",
+      "layout": "8 ft wide, sloping upward",
+      "connections": [
+        {"direction": "south", "destination": "grell_throne", "blocked_by": null},
+        {"direction": "north", "destination": "cave_exit", "blocked_by": null}
+      ],
+      "encounters": [],
+      "hazards": [
+        {
+          "type": "Collapse Risk",
+          "trigger": "Loud noise (explosion, fireball, etc.)",
+          "effect": "DC 14 Dex save or take 2d6 bludgeoning as rocks fall; passage becomes impassable"
+        }
+      ]
+    },
+    "cave_exit": {
+      "room_id": "cave_exit",
+      "name": "Mountain Exit",
+      "description_cues": "Narrow cave mouth opens to mountainside, moonlight streams in, view of surrounding valley",
+      "layout": "10 ft wide opening",
+      "connections": [
+        {"direction": "south", "destination": "escape_tunnel", "blocked_by": null}
+      ],
+      "encounters": [],
+      "hazards": [
+        {
+          "type": "Sheer Cliff Edge",
+          "trigger": "Exiting without care",
+          "effect": "100 ft drop, 10d6 fall damage, DC 14 Athletics to find safe footing",
+          "note": "Grell will attempt to jump down (he survives; kobolds are hardy)"
+        }
+      ]
+    }
+  },
+
+  "npcs": {
+    "grell": {
+      "name": "Grell",
+      "title": "Kobold Warlord",
+      "race": "Kobold",
+      "role": "Primary antagonist",
+      "alignment": "Chaotic Evil",
+      "personality_sketch": "Ambitious, tactical, believes himself descended from a dragon. Respects strength and combat prowess. Brutal to subordinates but capable of grudging respect for worthy foes.",
+      "relationship_to_party": "Rival/Enemy",
+      "knowledge": [
+        "Hired by a mage named Vex to acquire the Shard for unknown purposes",
+        "Believes the Shard amplifies draconic power",
+        "Plans to use it to unite all kobold clans under his rule"
+      ],
+      "dialogue_style": "Haughty, calls enemies 'worms' or 'soft-skins', dramatic",
+      "stat_block_ref": "encounter_3"
+    },
+    "captain_jerk": {
+      "name": "Captain Jerk",
+      "title": "Goblin Mercenary Captain",
+      "race": "Goblin",
+      "role": "Lieutenant, potential source of information",
+      "alignment": "Chaotic Neutral",
+      "personality_sketch": "Greedy, talks too much when scared, loves gold and gambling, cowardly but desperate to maintain rank",
+      "relationship_to_party": "Enemy (can be coerced into talking)",
+      "knowledge": [
+        "Details about Vex's appearance: tiefling woman, wears purple robes, has a silvery dagger",
+        "Vex paid handsomely but refused to take the Shard herself",
+        "Something about Vex needing it 'before the eclipse'"
+      ],
+      "dialogue_style": "Nervous rambling, deals-making, whiny",
+      "stat_block_ref": "encounter_1"
+    },
+    "vex": {
+      "name": "Vex",
+      "title": "Mysterious Mage (off-stage NPC)",
+      "race": "Tiefling",
+      "role": "Hidden antagonist / quest hook for future",
+      "alignment": "Neutral Evil",
+      "personality_sketch": "Cultured, patient, mysterious. Views mercenaries and warlords as disposable tools.",
+      "relationship_to_party": "Unknown (not encountered in this adventure)",
+      "knowledge": "Unknown to party initially",
+      "appearance_notes": "Purple robes, silvery dagger, cool demeanor",
+      "plot_hook": "Interrogating Captain Jerk or Grell can reveal her involvement; opens door for future adventure"
+    }
+  },
+
+  "pacing_notes": {
+    "session_1": "Barracks encounter → Main Hall optional encounter (or full combat) → decision on next move",
+    "session_2": "Armory exploration → Treasury glyph puzzle → escape sequence",
+    "session_3": "Grell throne confrontation → chase through escape tunnel → final confrontation or escape"
+  },
+
+  "difficulty_scaling": {
+    "easy": "Skip Encounter 2 (Main Hall patrol) or reduce Grell's HP to 40 and elite guards to 15 HP",
+    "hard": "Add 2 additional Kobold Sorcerers to Grell's throne room; increase Encounter 2 Sorcerer spell slots; add glyph trap in Armory"
+  },
+
+  "reward_summary": {
+    "gold_total": 805,
+    "magical_items": "+1 Longsword, +1 Greatsword, Amulet of Health, Shard of Kaelas",
+    "gems_total": 550,
+    "experience": "~3750 XP per PC (Medium encounter progression)"
+  }
+}
