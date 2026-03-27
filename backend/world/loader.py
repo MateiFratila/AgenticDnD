@@ -1,9 +1,10 @@
 """
-Adventure loader: parses JSON assets and builds initial WorldState.
+Adventure loader: restores from snapshots first, or builds initial WorldState from assets.
 """
 from typing import Dict, Any, Optional
 import json
 from pathlib import Path
+from uuid import uuid4
 from .state import (
     WorldState,
     PCState,
@@ -16,33 +17,45 @@ from .state import (
 
 
 class AdventureLoader:
-    """Loads PC sheets, adventure data, and rules, returns initialized WorldState."""
+    """Loads world state from snapshots first, then falls back to assets."""
 
-    def __init__(self, assets_dir: Path):
+    def __init__(
+        self,
+        assets_dir: Path,
+        snapshot_dir: Path | str = "artifacts/world_snapshots",
+    ):
         """
         Args:
             assets_dir: Path to assets/ directory containing JSON files.
+            snapshot_dir: Path where world snapshots are persisted.
         """
         self.assets_dir = Path(assets_dir)
+        self.snapshot_dir = Path(snapshot_dir)
 
     def load_adventure(
         self,
         adventure_file: str,
         pc_files: list[str],
         rules_file: Optional[str] = None,
+        game_session_id: Optional[str] = None,
     ) -> WorldState:
         """
-        Load adventure, PCs, and rules into a WorldState.
+        Load latest world snapshot first, otherwise initialize from assets.
 
         Args:
             adventure_file: Filename of adventure JSON (e.g., "adventure_sunken_grotto.json")
             pc_files: List of PC filenames (e.g., ["pc_aldric_stonehammer.json", ...])
             rules_file: Optional homebrew rules file (e.g., "homebrew_rules.json")
+            game_session_id: Optional session id to restore a specific game session.
 
         Returns:
-            Initialized WorldState ready for simulation.
+            Restored or newly initialized WorldState.
         """
-        # Load raw JSON data
+        latest_snapshot = self._find_latest_snapshot(game_session_id=game_session_id)
+        if latest_snapshot is not None:
+            return self._load_world_from_snapshot(latest_snapshot)
+
+        # Load raw JSON data for a fresh world.
         adventure_data = self._load_json(adventure_file)
         pc_data_list = [self._load_json(f) for f in pc_files]
         rules_data = self._load_json(rules_file) if rules_file else {}
@@ -54,9 +67,10 @@ class AdventureLoader:
         encounters = self._build_encounters(adventure_data)
         objectives = self._build_objectives(adventure_data)
 
-        # Create world state
+        # Create world state with a fresh short session id.
         world = WorldState(
             adventure_title=adventure_data.get("title", "Unknown Adventure"),
+            game_session_id=game_session_id or self._generate_game_session_id(),
             turn_count=0,
             party=party,
             npcs=npcs,
@@ -232,3 +246,124 @@ class AdventureLoader:
             )
             objectives[obj_id] = objective
         return objectives
+
+    def _generate_game_session_id(self) -> str:
+        """Generate a short random session id."""
+        return uuid4().hex[:5]
+
+    def _find_latest_snapshot(self, game_session_id: Optional[str]) -> Optional[Path]:
+        """Find latest snapshot, optionally filtered by game session id."""
+        if not self.snapshot_dir.exists():
+            return None
+
+        snapshot_files = sorted(
+            self.snapshot_dir.glob("*loop_*.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if not snapshot_files:
+            return None
+
+        if game_session_id is None:
+            return snapshot_files[0]
+
+        for snapshot_path in snapshot_files:
+            try:
+                snapshot_data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if snapshot_data.get("game_session_id") == game_session_id:
+                return snapshot_path
+
+        return None
+
+    def _load_world_from_snapshot(self, snapshot_path: Path) -> WorldState:
+        """Load and materialize a WorldState from snapshot JSON."""
+        snapshot_data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+        party = {
+            pc_id: PCState(
+                id=pc_data["id"],
+                name=pc_data["name"],
+                race=pc_data["race"],
+                char_class=pc_data["char_class"],
+                level=pc_data["level"],
+                stats=AbilityScores(**pc_data["stats"]),
+                hp_max=pc_data["hp_max"],
+                hp_current=pc_data["hp_current"],
+                ac=pc_data["ac"],
+                position=pc_data["position"],
+                conditions=pc_data.get("conditions", []),
+                is_alive=pc_data.get("is_alive", True),
+            )
+            for pc_id, pc_data in snapshot_data.get("party", {}).items()
+        }
+
+        npcs = {
+            npc_id: NPCState(
+                id=npc_data["id"],
+                name=npc_data["name"],
+                npc_type=npc_data["npc_type"],
+                hp_max=npc_data["hp_max"],
+                hp_current=npc_data["hp_current"],
+                ac=npc_data["ac"],
+                position=npc_data["position"],
+                role=npc_data["role"],
+                is_alive=npc_data.get("is_alive", True),
+                morale=npc_data.get("morale", 0),
+            )
+            for npc_id, npc_data in snapshot_data.get("npcs", {}).items()
+        }
+
+        rooms = {
+            room_id: RoomState(
+                id=room_data["id"],
+                name=room_data["name"],
+                is_cleared=room_data.get("is_cleared", False),
+                is_visited=room_data.get("is_visited", False),
+                trap_disarmed=room_data.get("trap_disarmed", False),
+                npc_ids=room_data.get("npc_ids", []),
+                pc_ids=room_data.get("pc_ids", []),
+            )
+            for room_id, room_data in snapshot_data.get("rooms", {}).items()
+        }
+
+        encounters = {
+            enc_id: EncounterState(
+                id=enc_data["id"],
+                name=enc_data["name"],
+                room_id=enc_data["room_id"],
+                is_active=enc_data.get("is_active", False),
+                is_cleared=enc_data.get("is_cleared", False),
+                round_count=enc_data.get("round_count", 0),
+                npc_ids=enc_data.get("npc_ids", []),
+            )
+            for enc_id, enc_data in snapshot_data.get("encounters", {}).items()
+        }
+
+        objectives = {
+            obj_id: ObjectiveState(
+                id=obj_data["id"],
+                goal=obj_data.get("goal", ""),
+                is_completed=obj_data.get("is_completed", False),
+                is_failed=obj_data.get("is_failed", False),
+            )
+            for obj_id, obj_data in snapshot_data.get("objectives", {}).items()
+        }
+
+        return WorldState(
+            adventure_title=snapshot_data.get("adventure_title", "Unknown Adventure"),
+            game_session_id=snapshot_data.get("game_session_id") or self._generate_game_session_id(),
+            turn_count=snapshot_data.get("turn_count", 0),
+            party=party,
+            npcs=npcs,
+            rooms=rooms,
+            encounters=encounters,
+            objectives=objectives,
+            homebrew_rules=snapshot_data.get("homebrew_rules", {}),
+            active_encounter_id=snapshot_data.get("active_encounter_id"),
+            turn_log=snapshot_data.get("turn_log", []),
+            active_actor_id=snapshot_data.get("active_actor_id"),
+            awaiting_input_from=snapshot_data.get("awaiting_input_from"),
+            world_version=snapshot_data.get("world_version", 0),
+        )

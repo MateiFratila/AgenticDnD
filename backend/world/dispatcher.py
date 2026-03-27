@@ -70,6 +70,12 @@ class WorldStateDispatcher:
             return world.add_log_entry(mutation.entry)
         if mutation_type == MutationType.INCREMENT_TURN:
             return world.increment_turn()
+        if mutation_type == MutationType.SET_ACTIVE_ACTOR:
+            return world.set_active_actor(mutation.actor_id)
+        if mutation_type == MutationType.SET_AWAITING_INPUT:
+            return world.set_awaiting_input(mutation.actor_id)
+        if mutation_type == MutationType.INCREMENT_VERSION:
+            return world.increment_version()
 
         raise DispatchError(f"Unsupported mutation type: {mutation_type}")
 

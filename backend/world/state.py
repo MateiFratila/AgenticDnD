@@ -153,6 +153,7 @@ class ObjectiveState:
 class WorldState:
     """Complete game world state for D&D simulation."""
     adventure_title: str
+    game_session_id: str = ""  # short session identifier (5 chars)
     turn_count: int = 0
     party: Dict[str, PCState] = field(default_factory=dict)  # PC id → PCState
     npcs: Dict[str, NPCState] = field(default_factory=dict)  # NPC id → NPCState
@@ -162,6 +163,10 @@ class WorldState:
     homebrew_rules: Dict[str, Any] = field(default_factory=dict)
     active_encounter_id: Optional[str] = None
     turn_log: List[str] = field(default_factory=list)
+    # Session / orchestration metadata
+    active_actor_id: Optional[str] = None       # Actor whose turn is currently being processed
+    awaiting_input_from: Optional[str] = None   # Actor whose input is needed next
+    world_version: int = 0                       # Monotonic counter; increments on every committed turn
 
     # Utility methods for safe state mutations
 
@@ -202,6 +207,18 @@ class WorldState:
         """Add entry to turn log. Returns new WorldState."""
         new_log = [*self.turn_log, entry]
         return replace(self, turn_log=new_log)
+
+    def set_active_actor(self, actor_id: Optional[str]) -> "WorldState":
+        """Set the actor currently being processed. Returns new WorldState."""
+        return replace(self, active_actor_id=actor_id)
+
+    def set_awaiting_input(self, actor_id: Optional[str]) -> "WorldState":
+        """Set the actor whose input is required next. Returns new WorldState."""
+        return replace(self, awaiting_input_from=actor_id)
+
+    def increment_version(self) -> "WorldState":
+        """Increment world version counter. Returns new WorldState."""
+        return replace(self, world_version=self.world_version + 1)
 
     @property
     def party_alive(self) -> List[PCState]:

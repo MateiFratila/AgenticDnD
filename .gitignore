@@ -1,4 +1,6 @@
 .venv/
+.env
 __pycache__/
 .chromadb/
 backend/llm_config.local.json
+artifacts/world_snapshots/

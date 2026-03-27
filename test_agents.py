@@ -1,0 +1,74 @@
+"""Test agent initialization and prompt loading."""
+
+from backend.agents import BaseAgent
+from backend.llm import PromptLoader
+
+
+def test_prompt_loader():
+    """Test that prompts can be loaded correctly."""
+    loader = PromptLoader()
+
+    # Load adjudicator system prompt
+    adjudicator_prompt = loader.load_prompt("adjudicator", "system")
+    assert len(adjudicator_prompt) > 0, "Adjudicator prompt is empty"
+    assert "ruling" in adjudicator_prompt.lower(), "Adjudicator prompt missing expected content"
+    assert "destination" in adjudicator_prompt.lower(), "Adjudicator prompt missing routing contract"
+    print(f"✓ Adjudicator system prompt loaded: {len(adjudicator_prompt)} chars")
+
+    # Load extractor system prompt
+    extractor_prompt = loader.load_prompt("extractor", "system")
+    assert len(extractor_prompt) > 0, "Extractor prompt is empty"
+    assert "mutation" in extractor_prompt.lower(), "Extractor prompt missing expected content"
+    print(f"✓ Extractor system prompt loaded: {len(extractor_prompt)} chars")
+
+
+def test_base_agent_initialization():
+    """Test that BaseAgent can be initialized and configured."""
+    # Create an adjudicator agent instance
+    adjudicator = BaseAgent(
+        agent_type="adjudicator",
+        agent_name="DM Adjudicator",
+        temperature=0.5,
+        max_tokens=2000,
+    )
+
+    assert adjudicator.agent_type == "adjudicator"
+    assert adjudicator.agent_name == "DM Adjudicator"
+    assert adjudicator.temperature == 0.5
+    assert adjudicator.max_tokens == 2000
+    print("✓ Adjudicator agent initialized")
+
+    # Verify prompt loading works
+    system_prompt = adjudicator._load_system_prompt()
+    assert len(system_prompt) > 0, "Loaded system prompt is empty"
+    print(f"✓ Agent can load system prompt: {len(system_prompt)} chars")
+    
+    # Verify LLM client was initialized (but may not be usable without API key)
+    assert adjudicator.llm_client is not None, "LLM client not initialized"
+    print(f"✓ LLM client initialized (API key set: {adjudicator.llm_client.api_key_set})")
+
+
+def test_base_agent_extractor():
+    """Test extractor agent initialization."""
+    extractor = BaseAgent(
+        agent_type="extractor",
+        agent_name="Mutation Extractor",
+        temperature=0.3,
+        max_tokens=1500,
+    )
+
+    assert extractor.agent_type == "extractor"
+    assert extractor.agent_name == "Mutation Extractor"
+    print("✓ Extractor agent initialized")
+
+    # Verify prompt loading works
+    system_prompt = extractor._load_system_prompt()
+    assert "mutation" in system_prompt.lower()
+    print(f"✓ Extractor agent can load system prompt")
+
+
+if __name__ == "__main__":
+    test_prompt_loader()
+    test_base_agent_initialization()
+    test_base_agent_extractor()
+    print("\n✅ All agent tests passed!")

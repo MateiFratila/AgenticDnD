@@ -25,6 +25,9 @@ class MutationType(str, Enum):
     DISARM_ROOM_TRAP = "disarm_room_trap"
     APPEND_LOG_ENTRY = "append_log_entry"
     INCREMENT_TURN = "increment_turn"
+    SET_ACTIVE_ACTOR = "set_active_actor"
+    SET_AWAITING_INPUT = "set_awaiting_input"
+    INCREMENT_VERSION = "increment_version"
 
 
 @dataclass(frozen=True)
@@ -43,3 +46,4 @@ class WorldMutation:
     entry: Optional[str] = None
     is_active: Optional[bool] = None
     is_cleared: Optional[bool] = None
+    actor_id: Optional[str] = None  # used by SET_ACTIVE_ACTOR / SET_AWAITING_INPUT
