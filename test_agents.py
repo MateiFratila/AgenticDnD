@@ -1,5 +1,7 @@
 """Test agent initialization and prompt loading."""
 
+from types import SimpleNamespace
+
 from backend.agents import BaseAgent
 from backend.llm import PromptLoader
 
@@ -65,6 +67,33 @@ def test_base_agent_extractor():
     system_prompt = extractor._load_system_prompt()
     assert "mutation" in system_prompt.lower()
     print(f"✓ Extractor agent can load system prompt")
+
+
+def test_base_agent_fallback_when_llm_content_is_none(monkeypatch):
+    """Ensure deterministic fallback is used when provider returns None content."""
+    adjudicator = BaseAgent(agent_type="adjudicator", agent_name="Adjudicator")
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                finish_reason="stop",
+                message=SimpleNamespace(content=None),
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+
+    monkeypatch.setattr(adjudicator.llm_client, "chat_completion", lambda **_: fake_response)
+
+    adjudication = adjudicator.think_adjudication(user_input="Adventure Start")
+    assert adjudication.status == "approved"
+    assert any(route.actor == "extractor" for route in adjudication.destination)
+
+    extractor = BaseAgent(agent_type="extractor", agent_name="Extractor")
+    monkeypatch.setattr(extractor.llm_client, "chat_completion", lambda **_: fake_response)
+
+    extraction = extractor.think_extraction(user_input="Extract mutations")
+    assert len(extraction.root) >= 1
 
 
 if __name__ == "__main__":

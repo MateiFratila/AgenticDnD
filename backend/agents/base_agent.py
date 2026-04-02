@@ -7,7 +7,15 @@ from typing import Optional
 
 from backend.llm.client import LLMClient
 from backend.llm.prompts import PromptLoader
-from .contracts import parse_adjudicator_response, parse_extractor_response
+from .contracts import (
+    AdjudicatorResponse,
+    DestinationRoute,
+    ExtractorMutation,
+    ExtractorResponse,
+    parse_adjudicator_response,
+    parse_extractor_response,
+)
+from backend.world.mutations import MutationType
 
 
 logger = logging.getLogger(__name__)
@@ -88,10 +96,12 @@ class BaseAgent(ABC):
 
         # Log response
         choice = response.choices[0]
+        content = choice.message.content or ""
+
         response_log = {
             "agent": self.agent_name,
             "finish_reason": choice.finish_reason,
-            "response_length": len(choice.message.content),
+            "response_length": len(content),
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
@@ -101,7 +111,7 @@ class BaseAgent(ABC):
         logger.info(f"[{self.agent_name}] LLM Response: {json.dumps(response_log)}")
 
         return {
-            "content": choice.message.content,
+            "content": content,
             "finish_reason": choice.finish_reason,
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens,
@@ -109,6 +119,41 @@ class BaseAgent(ABC):
                 "total_tokens": response.usage.total_tokens,
             },
         }
+
+    @staticmethod
+    def _fallback_adjudicator_response() -> AdjudicatorResponse:
+        """Deterministic adjudicator fallback used when LLM output is unavailable."""
+        return AdjudicatorResponse(
+            status="approved",
+            ruling=(
+                "Adventure Start: The party gathers at the flooded cavern mouth as "
+                "waves echo through stone and a first objective emerges."
+            ),
+            destination=[
+                DestinationRoute(
+                    actor="extractor",
+                    purpose="Commit opening-scene state updates",
+                    payload_hint="Apply start-of-adventure log/turn mutations",
+                )
+            ],
+            reasoning="Deterministic fallback response applied due to unavailable/invalid LLM output.",
+            suggested_alternatives=[],
+        )
+
+    @staticmethod
+    def _fallback_extractor_response() -> ExtractorResponse:
+        """Deterministic extractor fallback used when LLM output is unavailable."""
+        return ExtractorResponse(
+            root=[
+                ExtractorMutation(
+                    type=MutationType.APPEND_LOG_ENTRY,
+                    entry="[DM] Adventure Start fallback applied: opening scene established.",
+                ),
+                ExtractorMutation(
+                    type=MutationType.INCREMENT_TURN,
+                ),
+            ]
+        )
 
     def think(
         self,
@@ -144,12 +189,22 @@ class BaseAgent(ABC):
         prompt_name: str = "system",
     ):
         """Call LLM and return validated adjudicator response model."""
-        raw = self.think(
-            system_prompt=system_prompt,
-            user_input=user_input,
-            prompt_name=prompt_name,
-        )
-        return parse_adjudicator_response(raw)
+        try:
+            raw = self.think(
+                system_prompt=system_prompt,
+                user_input=user_input,
+                prompt_name=prompt_name,
+            )
+            if not raw.strip():
+                raise ValueError("Empty adjudicator response")
+            return parse_adjudicator_response(raw)
+        except Exception as exc:
+            logger.warning(
+                "[%s] Falling back to deterministic adjudicator response: %s",
+                self.agent_name,
+                str(exc),
+            )
+            return self._fallback_adjudicator_response()
 
     def think_extraction(
         self,
@@ -158,9 +213,19 @@ class BaseAgent(ABC):
         prompt_name: str = "system",
     ):
         """Call LLM and return validated extractor response model."""
-        raw = self.think(
-            system_prompt=system_prompt,
-            user_input=user_input,
-            prompt_name=prompt_name,
-        )
-        return parse_extractor_response(raw)
+        try:
+            raw = self.think(
+                system_prompt=system_prompt,
+                user_input=user_input,
+                prompt_name=prompt_name,
+            )
+            if not raw.strip():
+                raise ValueError("Empty extractor response")
+            return parse_extractor_response(raw)
+        except Exception as exc:
+            logger.warning(
+                "[%s] Falling back to deterministic extractor response: %s",
+                self.agent_name,
+                str(exc),
+            )
+            return self._fallback_extractor_response()

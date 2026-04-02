@@ -24,9 +24,18 @@ Your output is:
 
 - Use world ids exactly as provided in state.
 - Resolve references from ruling text conservatively.
-- If a target id cannot be resolved with high confidence, return empty array and include one append_log_entry stating extraction failure.
+- Treat non-canonical narrative details (objects/entities not represented in world state) as flavor unless they are explicitly mapped to a supported canonical effect.
+- Prefer extracting the canonical subset of effects rather than failing the entire extraction.
+- If a required canonical target id cannot be resolved with high confidence, do not invent ids.
+- If no safe canonical mutation can be produced, return empty array and include one append_log_entry stating extraction failure.
 - Emit atomic operations only.
 - Preserve causal order (move before attack damage, etc.).
+
+Canonical extraction policy:
+- Free narrative is allowed upstream; only canonical consequences are committed here.
+- Never attempt to model unsupported low-level object state (for example door object ids, lock internals, inventory micro-state) unless such fields exist in world state and mutation schema.
+- When the ruling implies movement/navigation, map to room-level movement using known room ids.
+- When an implied detail is not representable, ignore that detail and continue extracting representable consequences.
 
 ## Supported Mutation Types
 

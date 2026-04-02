@@ -1,6 +1,7 @@
 """
 Adventure loader: restores from snapshots first, or builds initial WorldState from assets.
 """
+from dataclasses import asdict
 from typing import Dict, Any, Optional
 import json
 from pathlib import Path
@@ -102,6 +103,7 @@ class AdventureLoader:
                     ),
                 )
 
+        self.save_world_snapshot(world, actor_id="init")
         return world
 
     def _load_json(self, filename: str) -> Dict[str, Any]:
@@ -246,6 +248,19 @@ class AdventureLoader:
             )
             objectives[obj_id] = objective
         return objectives
+
+    def save_world_snapshot(self, world: WorldState, actor_id: str = "init") -> Path:
+        """Persist world state to the snapshot directory and return the path."""
+        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+        file_path = self.snapshot_dir / (
+            f"session_{world.game_session_id}_"
+            f"loop_0001_"
+            f"turn_{world.turn_count:04d}_"
+            f"v_{world.world_version:04d}_"
+            f"actor_{actor_id}.json"
+        )
+        file_path.write_text(json.dumps(asdict(world), indent=2), encoding="utf-8")
+        return file_path
 
     def _generate_game_session_id(self) -> str:
         """Generate a short random session id."""

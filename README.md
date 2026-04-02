@@ -2,6 +2,8 @@
 
 Turn-based D&D simulation backend with a deterministic world engine, LLM adjudication, mutation extraction, orchestration, and snapshot inspection tools.
 
+Architecture notes: [docs/architecture.md](docs/architecture.md)
+
 ## Project Layout
 
 - `assets/`: Adventure data, PCs, and homebrew rules JSON files.
@@ -35,6 +37,16 @@ Turn-based D&D simulation backend with a deterministic world engine, LLM adjudic
 	`python test_orchestrator.py`
 - Run snapshot utility checks:
 	`python test_snapshot_tools.py`
+- Run REST API tests:
+	`python test_api.py`
+
+### REST API Commands
+
+- Start development server:
+	`uvicorn backend.main:app --reload`
+  The server will initialize the game engine on startup and listen on `http://localhost:8000`.
+- View interactive API documentation:
+	`http://localhost:8000/docs` (Swagger UI)
 
 ### Snapshot Tooling Commands
 
@@ -86,6 +98,18 @@ What it does:
 - Falls back to creating a fresh world from `assets/` if no matching snapshot exists.
 - Generates a short 5-character `game_session_id` on fresh world creation.
 
+### REST API
+
+File: `backend/main.py` (app factory) and `backend/api/` (routes and models)
+
+What it does:
+- Wraps `TableOrchestrator` in a FastAPI application.
+- Initializes the game engine on startup (loads world from snapshots or assets, creates agents, starts orchestrator).
+- Exposes POST `/api/advance` endpoint to process player actions (actor + freetext action).
+- Routes actions through Adjudicator/Extractor layers and applies mutations to world state.
+- Persists snapshots after each turn.
+- Supports questions (answered without turn advance) and action intents (approved/rejected, may advance turn).
+
 ## Test Inventory
 
 ### `test_loader.py`
@@ -125,6 +149,16 @@ Covers:
 - Snapshot listing order.
 - Direct file diff behavior.
 - `diff-latest` success path and insufficient-snapshot failure path.
+
+### `test_api.py`
+
+Covers:
+- App lifespan initialization (agent creation, orchestrator setup).
+- Endpoint contract validation and response models.
+- Actor turn validation (reject actions from non-active actor).
+- Approved and rejected action flows via HTTP POST.
+- World state persistence across requests.
+- Error handling and graceful fallback responses.
 
 ## README Maintenance Rule
 
