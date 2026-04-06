@@ -33,7 +33,7 @@ class LLMClient:
         self,
         messages: list[dict],
         temperature: float = 0.7,
-        max_tokens: int = 2000,
+        max_tokens: int = 6000,
     ) -> dict:
         """
         Call Azure OpenAI chat completion.

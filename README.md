@@ -69,6 +69,9 @@ File: `backend/orchestrator/table_orchestrator.py`
 
 What it does:
 - Runs one turn loop: adjudication -> extraction -> mutation application.
+- Builds a scoped adjudicator payload focused on the acting PC, current scene, active objectives, recent turn history, and nearby room connections instead of dumping the full world state.
+- Keeps the same actor awaited when a ruling asks for an unresolved roll/check, rather than advancing turn prematurely.
+- Records adjudicator rulings into `world.turn_log` so future turns retain DM-facing narrative history, while extractor/world entries can still capture canonical state changes.
 - Stores session metadata in world state (`active_actor_id`, `awaiting_input_from`, `world_version`).
 - Persists a world snapshot JSON as the final step of each loop.
 
@@ -105,7 +108,7 @@ File: `backend/main.py` (app factory) and `backend/api/` (routes and models)
 What it does:
 - Wraps `TableOrchestrator` in a FastAPI application.
 - Initializes the game engine on startup (loads world from snapshots or assets, creates agents, starts orchestrator).
-- Exposes POST `/api/advance` endpoint to process player actions (actor + freetext action).
+- Exposes POST `/api/advance` to process player actions and GET `/api/rewind` to drop the newest snapshot and restore the previous one for the active session.
 - Routes actions through Adjudicator/Extractor layers and applies mutations to world state.
 - Persists snapshots after each turn.
 - Supports questions (answered without turn advance) and action intents (approved/rejected, may advance turn).
@@ -157,6 +160,7 @@ Covers:
 - Endpoint contract validation and response models.
 - Actor turn validation (reject actions from non-active actor).
 - Approved and rejected action flows via HTTP POST.
+- Rewind behavior that deletes the newest session snapshot and reloads the previous one.
 - World state persistence across requests.
 - Error handling and graceful fallback responses.
 

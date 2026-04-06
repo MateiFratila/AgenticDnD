@@ -136,6 +136,7 @@ class RoomState:
     is_cleared: bool = False
     is_visited: bool = False
     trap_disarmed: bool = False
+    connections: List[Dict[str, Any]] = field(default_factory=list)  # exits from this room
     npc_ids: List[str] = field(default_factory=list)  # NPCs currently in room
     pc_ids: List[str] = field(default_factory=list)  # PCs currently in room
 

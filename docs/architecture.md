@@ -58,7 +58,8 @@ This keeps world writes auditable and testable.
 The orchestrator:
 
 - reads the active actor from world state
-- calls the adjudicator
+- calls the adjudicator using a scoped world view (actor, current scene, nearby room connections, active objectives, recent log, relevant rules)
+- waits on the same actor when a ruling still requires a player roll/check or clarification
 - optionally calls the extractor
 - applies mutations through the dispatcher
 - advances turn metadata
@@ -139,6 +140,10 @@ The `action` string is processed by the Orchestrator through the Adjudicator/Ext
 - **Rejections**: Invalid or illegal actions (adjudicator rejects, does not advance turn)
 
 Not all responses advance the turn. Questions and clarifications keep the turn on the same actor.
+
+**GET `/api/rewind`**
+
+Delete the latest persisted snapshot for the active session and restore the previous snapshot into the running orchestrator.
 
 **GET `/api/status`**
 

@@ -28,4 +28,5 @@
 ## Conventions
 - Log turn activity with clear prefixes (`[AGENT]`, `[MEMORY]`, `[DM]`, `[WORLD]`).
 - Keep tool interfaces stable and serializable (Pydantic models).
+- For world-state schema, payload-scoping, turn-history, or trace-metadata changes, consult the `world-state` skill in `.github/skills/world-state/SKILL.md`.
 - Handle missing OpenAI credentials gracefully with deterministic fallback behavior.

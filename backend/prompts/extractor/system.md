@@ -35,6 +35,8 @@ Canonical extraction policy:
 - Free narrative is allowed upstream; only canonical consequences are committed here.
 - Never attempt to model unsupported low-level object state (for example door object ids, lock internals, inventory micro-state) unless such fields exist in world state and mutation schema.
 - When the ruling implies movement/navigation, map to room-level movement using known room ids.
+- Use `world_state.rooms_of_interest[*].connections` as the canonical navigation graph for nearby movement.
+- If the current room has exactly one unblocked outgoing connection and the ruling refers to "ahead", "forward", "the next room", or similar nearby movement, resolve to that single connected destination instead of failing.
 - When an implied detail is not representable, ignore that detail and continue extracting representable consequences.
 
 ## Supported Mutation Types

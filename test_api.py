@@ -329,3 +329,70 @@ def test_api_init_resets_and_kicks_off(monkeypatch):
         assert "Adventure Start" in stub_orchestrator.kickoff_action
 
         assert not any(snapshot_dir.glob("*loop_*.json"))
+
+
+def test_api_rewind_deletes_latest_snapshot_and_reloads_previous(monkeypatch):
+    """GET /api/rewind should drop the latest snapshot and restore the previous one."""
+    from backend.api import routes
+    from fastapi import FastAPI
+    import os
+    import time
+
+    app = FastAPI()
+    from backend.api import router
+
+    app.include_router(router)
+    client = TestClient(app)
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        older_snapshot = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
+        latest_snapshot = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        older_snapshot.write_text("{}", encoding="utf-8")
+        latest_snapshot.write_text("{}", encoding="utf-8")
+
+        now = time.time()
+        os.utime(older_snapshot, (now - 10, now - 10))
+        os.utime(latest_snapshot, (now, now))
+
+        current_world = SimpleNamespace(
+            game_session_id="abcde",
+            active_actor_id="aldric_stonehammer",
+            awaiting_input_from="aldric_stonehammer",
+            world_version=1,
+            turn_count=1,
+            party={"aldric_stonehammer": object(), "sylara_nightveil": object()},
+        )
+        restored_world = SimpleNamespace(
+            game_session_id="abcde",
+            active_actor_id="sylara_nightveil",
+            awaiting_input_from="sylara_nightveil",
+            world_version=0,
+            turn_count=0,
+            party={"aldric_stonehammer": object(), "sylara_nightveil": object()},
+        )
+
+        current_orchestrator = SimpleNamespace(world=current_world)
+        restored_orchestrator = SimpleNamespace(world=restored_world)
+
+        monkeypatch.setattr(routes, "_snapshot_dir", lambda: snapshot_dir)
+        monkeypatch.setattr(
+            routes,
+            "_build_fresh_orchestrator",
+            lambda _, game_session_id=None: restored_orchestrator,
+        )
+
+        set_orchestrator(current_orchestrator, "abcde")
+
+        response = client.get("/api/rewind")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["deleted_snapshot"] == latest_snapshot.name
+        assert data["restored_from_snapshot"] == older_snapshot.name
+        assert data["session_id"] == "abcde"
+        assert latest_snapshot.exists() is False
+        assert routes.get_orchestrator() is restored_orchestrator

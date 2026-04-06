@@ -43,14 +43,31 @@ def _clear_world_snapshots(snapshot_dir: Path) -> int:
     return deleted_count
 
 
-def _build_fresh_orchestrator(snapshot_dir: Path) -> TableOrchestrator:
-    """Build a new orchestrator from source assets only."""
+def _list_world_snapshots(snapshot_dir: Path, session_id: str | None = None) -> list[Path]:
+    """Return session snapshots ordered newest-first by modification time."""
+    if not snapshot_dir.exists():
+        return []
+
+    pattern = f"session_{session_id}_loop_*.json" if session_id else "*loop_*.json"
+    return sorted(
+        snapshot_dir.glob(pattern),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _build_fresh_orchestrator(
+    snapshot_dir: Path,
+    game_session_id: str | None = None,
+) -> TableOrchestrator:
+    """Build a new orchestrator from the latest matching snapshot or source assets."""
     loader = AdventureLoader(_assets_dir(), snapshot_dir=snapshot_dir)
 
     world = loader.load_adventure(
         adventure_file="adventure_sunken_grotto.json",
         pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
         rules_file="homebrew_rules.json",
+        game_session_id=game_session_id,
     )
 
     adjudicator_agent = BaseAgent(
@@ -124,6 +141,60 @@ async def init_game() -> dict:
         }
     except Exception as e:
         logger.error("[API] Error initializing game: %s", str(e), exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/rewind")
+async def rewind_game() -> dict:
+    """Delete the latest snapshot for the active session and reload the previous one."""
+    try:
+        orchestrator = get_orchestrator()
+        snapshot_dir = _snapshot_dir()
+        session_id = _state.get("session_id") or orchestrator.world.game_session_id
+
+        snapshots = _list_world_snapshots(snapshot_dir, session_id=session_id)
+        if len(snapshots) < 2:
+            return {
+                "success": False,
+                "error": (
+                    f"Cannot rewind session {session_id}: at least 2 snapshots are required, "
+                    f"found {len(snapshots)}."
+                ),
+                "session_id": session_id,
+            }
+
+        deleted_snapshot = snapshots[0]
+        deleted_snapshot.unlink()
+
+        remaining_snapshots = _list_world_snapshots(snapshot_dir, session_id=session_id)
+        restored_snapshot = remaining_snapshots[0] if remaining_snapshots else None
+
+        reloaded_orchestrator = _build_fresh_orchestrator(
+            snapshot_dir,
+            game_session_id=session_id,
+        )
+        set_orchestrator(reloaded_orchestrator, reloaded_orchestrator.world.game_session_id)
+
+        world = reloaded_orchestrator.world
+        logger.info(
+            "[API] Game rewound | session_id=%s | deleted=%s | restored=%s",
+            world.game_session_id,
+            deleted_snapshot.name,
+            restored_snapshot.name if restored_snapshot else None,
+        )
+
+        return {
+            "success": True,
+            "session_id": world.game_session_id,
+            "deleted_snapshot": deleted_snapshot.name,
+            "restored_from_snapshot": restored_snapshot.name if restored_snapshot else None,
+            "active_actor_id": world.active_actor_id,
+            "awaiting_input_from": world.awaiting_input_from,
+            "world_version": world.world_version,
+            "turn_count": world.turn_count,
+        }
+    except Exception as e:
+        logger.error("[API] Error rewinding game: %s", str(e), exc_info=True)
         return {"success": False, "error": str(e)}
 
 

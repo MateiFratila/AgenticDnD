@@ -89,7 +89,7 @@ class AdventureLoader:
             for pc_id in party.keys():
                 pc = party[pc_id]
                 world = world.update_pc(pc_id, pc.move_to(initial_room_id))
-                room = rooms[initial_room_id]
+                room = world.rooms[initial_room_id]
                 world = world.update_room(
                     initial_room_id,
                     RoomState(
@@ -98,6 +98,7 @@ class AdventureLoader:
                         is_cleared=room.is_cleared,
                         is_visited=True,
                         trap_disarmed=room.trap_disarmed,
+                        connections=room.connections,
                         npc_ids=room.npc_ids,
                         pc_ids=[*room.pc_ids, pc_id],
                     ),
@@ -196,12 +197,27 @@ class AdventureLoader:
         """Build rooms from adventure data."""
         rooms = {}
         for room_id, room_data in adventure_data.get("map", {}).items():
+            npc_ids = []
+            for encounter in room_data.get("encounters", []):
+                enc_id = encounter.get("id")
+                for i, _enemy in enumerate(encounter.get("enemies", [])):
+                    npc_ids.append(f"{enc_id}_enemy_{i}")
+
             room = RoomState(
                 id=room_id,
                 name=room_data.get("name", room_id),
                 is_cleared=False,
                 is_visited=False,
                 trap_disarmed=not room_data.get("hazards"),
+                connections=[
+                    {
+                        "direction": connection.get("direction"),
+                        "destination": connection.get("destination"),
+                        "blocked_by": connection.get("blocked_by"),
+                    }
+                    for connection in room_data.get("connections", [])
+                ],
+                npc_ids=npc_ids,
             )
             rooms[room_id] = room
         return rooms
@@ -337,6 +353,7 @@ class AdventureLoader:
                 is_cleared=room_data.get("is_cleared", False),
                 is_visited=room_data.get("is_visited", False),
                 trap_disarmed=room_data.get("trap_disarmed", False),
+                connections=room_data.get("connections", []),
                 npc_ids=room_data.get("npc_ids", []),
                 pc_ids=room_data.get("pc_ids", []),
             )

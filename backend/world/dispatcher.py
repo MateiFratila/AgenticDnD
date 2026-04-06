@@ -146,8 +146,6 @@ class WorldStateDispatcher:
             raise DispatchError("add_condition requires target_id")
         if not mutation.condition:
             raise DispatchError("add_condition requires condition")
-        if mutation.target_id not in world.party:
-            raise DispatchError("Conditions are currently supported only for PCs")
         pc = world.party[mutation.target_id]
         return world.update_pc(mutation.target_id, pc.add_condition(mutation.condition))
 
@@ -156,8 +154,6 @@ class WorldStateDispatcher:
             raise DispatchError("remove_condition requires target_id")
         if not mutation.condition:
             raise DispatchError("remove_condition requires condition")
-        if mutation.target_id not in world.party:
-            raise DispatchError("Conditions are currently supported only for PCs")
         pc = world.party[mutation.target_id]
         return world.update_pc(mutation.target_id, pc.remove_condition(mutation.condition))
 

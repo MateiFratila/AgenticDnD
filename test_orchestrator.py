@@ -36,6 +36,23 @@ class FakeExtractorAgent:
         return _approved_extractor(None, _approved_adjudicator(None, "", ""))
 
 
+def _game_start_adjudicator(world, actor_id: str, action_text: str) -> AdjudicatorResponse:
+    """Fake opening-scene adjudicator response."""
+    return AdjudicatorResponse(
+        status="game_start",
+        ruling="The grotto mouth yawns ahead, and the hunt for the Shard of Kaelas begins.",
+        destination=[
+            DestinationRoute(
+                actor="extractor",
+                purpose="Record the opening scene and initialize play",
+                payload_hint="Emit any safe start-of-adventure mutations",
+            )
+        ],
+        reasoning="Opening scene setup for a fresh session.",
+        suggested_alternatives=[],
+    )
+
+
 def _approved_adjudicator(world, actor_id: str, action_text: str) -> AdjudicatorResponse:
     """Fake adjudicator for deterministic orchestrator testing."""
     return AdjudicatorResponse(
@@ -93,6 +110,87 @@ def _rejected_adjudicator(world, actor_id: str, action_text: str) -> Adjudicator
     )
 
 
+def _pending_roll_adjudicator(world, actor_id: str, action_text: str) -> AdjudicatorResponse:
+    """Fake unresolved skill-check ruling that should keep the same actor awaiting input."""
+    return AdjudicatorResponse(
+        status="approved",
+        ruling="Sylara slips toward the tunnel mouth. Roll Dexterity (Stealth) to determine whether you enter undetected.",
+        destination=[
+            DestinationRoute(
+                actor="extractor",
+                purpose="Attempt to map the movement",
+                payload_hint="Move toward the next connected room if the action fully resolves",
+            )
+        ],
+        reasoning="The declared stealth approach is legal but the outcome depends on a roll.",
+        suggested_alternatives=[],
+    )
+
+
+def _empty_extractor(world, adjudication: AdjudicatorResponse) -> ExtractorResponse:
+    """Fake extractor returning no canonical mutations for unresolved-roll scenarios."""
+    return ExtractorResponse(root=[])
+
+
+def test_orchestrator_game_start_history_label():
+    """The first DM history entry should use the game_start label even for an opening approved turn."""
+    assets_dir = Path(__file__).parent / "assets"
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
+            rules_file="homebrew_rules.json",
+        )
+
+        table = TableOrchestrator(
+            world=world,
+            turn_order=["aldric_stonehammer", "sylara_nightveil"],
+            adjudicator_fn=_approved_adjudicator,
+            extractor_fn=_approved_extractor,
+            snapshot_dir=snapshot_dir,
+        )
+
+        result = table.process_intent("Adventure Start: Establish the opening scene and immediate objective for the party.")
+
+    assert result.status == "approved"
+    assert table.world.turn_log[0].startswith("[DM][game_start][aldric_stonehammer]")
+    assert "Aldric charges and slams the goblin for 9 damage." in table.world.turn_log[0]
+    print("✓ Orchestrator game_start history labeling passed")
+
+
+def test_orchestrator_pending_roll_keeps_same_actor():
+    """If the DM asks for a roll, the same actor should remain awaited instead of advancing turn."""
+    assets_dir = Path(__file__).parent / "assets"
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
+            rules_file="homebrew_rules.json",
+        ).add_log_entry("[DM][game_start][sylara_nightveil] The adventure begins at the grotto mouth.")
+
+        table = TableOrchestrator(
+            world=world,
+            turn_order=["sylara_nightveil", "aldric_stonehammer"],
+            adjudicator_fn=_pending_roll_adjudicator,
+            extractor_fn=_empty_extractor,
+            snapshot_dir=snapshot_dir,
+        )
+
+        result = table.process_intent("I creep forward and try to stay hidden.")
+
+    assert result.status == "needs_clarification"
+    assert result.advanced_turn is False
+    assert result.awaiting_actor_id == "sylara_nightveil"
+    assert table.world.active_actor_id == "sylara_nightveil"
+    assert table.world.awaiting_input_from == "sylara_nightveil"
+    assert table.current_actor_id == "sylara_nightveil"
+    print("✓ Pending roll keeps the same actor awaiting input")
+
+
 def test_orchestrator_approved_flow():
     """Approved adjudication should call extractor and apply mutations."""
     assets_dir = Path(__file__).parent / "assets"
@@ -103,7 +201,7 @@ def test_orchestrator_approved_flow():
             adventure_file="adventure_sunken_grotto.json",
             pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
             rules_file="homebrew_rules.json",
-        )
+        ).add_log_entry("[DM][game_start][aldric_stonehammer] The adventure begins at the grotto mouth.")
 
         table = TableOrchestrator(
             world=world,
@@ -128,6 +226,8 @@ def test_orchestrator_approved_flow():
     assert table.world.active_actor_id == "sylara_nightveil"
     assert table.world.awaiting_input_from == "sylara_nightveil"
     assert table.world.world_version == 1
+    assert any(entry.startswith("[DM][approved][aldric_stonehammer]") for entry in table.world.turn_log)
+    assert any("Aldric charges and slams the goblin for 9 damage." in entry for entry in table.world.turn_log)
 
     transition_steps = [event.to_step for event in result.events]
     assert TableStep.ADJUDICATING in transition_steps
@@ -148,7 +248,7 @@ def test_orchestrator_rejected_flow_no_mutation():
             adventure_file="adventure_sunken_grotto.json",
             pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
             rules_file="homebrew_rules.json",
-        )
+        ).add_log_entry("[DM][game_start][aldric_stonehammer] The adventure begins at the grotto mouth.")
 
         table = TableOrchestrator(
             world=world,
@@ -173,6 +273,8 @@ def test_orchestrator_rejected_flow_no_mutation():
     assert table.world.active_actor_id == "aldric_stonehammer"
     assert table.world.awaiting_input_from == "aldric_stonehammer"
     assert table.world.world_version == 0
+    assert any(entry.startswith("[DM][rejected][aldric_stonehammer]") for entry in table.world.turn_log)
+    assert any("You cannot move through a blocked passage this turn." in entry for entry in table.world.turn_log)
 
     transition_steps = [event.to_step for event in result.events]
     assert TableStep.ADJUDICATING in transition_steps
@@ -211,12 +313,16 @@ def test_orchestrator_from_agents_llm_response_handling():
     assert extractor_agent.last_payload is not None
     assert adjudicator_agent.last_payload["action"] == "I rush the goblin and attack."
     assert adjudicator_agent.last_payload["actor_id"] == "aldric_stonehammer"
+    assert adjudicator_agent.last_payload["world_state"]["scope"] == "adjudicator_view"
+    assert adjudicator_agent.last_payload["world_state"]["actor"]["id"] == "aldric_stonehammer"
     assert "adjudication" in extractor_agent.last_payload
     assert extractor_agent.last_payload["adjudication"]["status"] == "approved"
     print("✓ Orchestrator from_agents LLM response handling passed")
 
 
 if __name__ == "__main__":
+    test_orchestrator_game_start_history_label()
+    test_orchestrator_pending_roll_keeps_same_actor()
     test_orchestrator_approved_flow()
     test_orchestrator_rejected_flow_no_mutation()
     test_orchestrator_from_agents_llm_response_handling()

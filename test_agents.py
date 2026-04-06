@@ -1,9 +1,15 @@
 """Test agent initialization and prompt loading."""
 
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from backend.agents import BaseAgent
+from backend.agents.contracts import AdjudicatorResponse, DestinationRoute
 from backend.llm import PromptLoader
+from backend.orchestrator import TableOrchestrator
+from backend.world import AdventureLoader
 
 
 def test_prompt_loader():
@@ -15,6 +21,9 @@ def test_prompt_loader():
     assert len(adjudicator_prompt) > 0, "Adjudicator prompt is empty"
     assert "ruling" in adjudicator_prompt.lower(), "Adjudicator prompt missing expected content"
     assert "destination" in adjudicator_prompt.lower(), "Adjudicator prompt missing routing contract"
+    assert "game_start" in adjudicator_prompt, "Adjudicator prompt should preserve the game_start status"
+    assert "1-3 sentences" in adjudicator_prompt, "Adjudicator prompt should enforce concise rulings"
+    assert "80 words" in adjudicator_prompt, "Adjudicator prompt should cap narrative length"
     print(f"✓ Adjudicator system prompt loaded: {len(adjudicator_prompt)} chars")
 
     # Load extractor system prompt
@@ -96,8 +105,52 @@ def test_base_agent_fallback_when_llm_content_is_none(monkeypatch):
     assert len(extraction.root) >= 1
 
 
+def test_trace_file_path_uses_session_metadata_from_payloads():
+    """Trace filenames should use real session/turn values for both payload shapes."""
+    assets_dir = Path(__file__).parent / "assets"
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
+            rules_file="homebrew_rules.json",
+        )
+
+        adjudicator_payload = TableOrchestrator.build_adjudicator_payload(
+            world,
+            "aldric_stonehammer",
+            "Adventure Start",
+        )
+        adjudicator_agent = BaseAgent(agent_type="adjudicator", agent_name="Adjudicator")
+        adjudicator_path = adjudicator_agent._build_trace_file_path("system", adjudicator_payload)
+        assert adjudicator_path.name == f"s_{world.game_session_id}_t_{world.turn_count:04d}_a_adjudicator.json"
+
+        adjudication = AdjudicatorResponse(
+            status="approved",
+            ruling="Aldric steps forward into the cave.",
+            destination=[
+                DestinationRoute(
+                    actor="extractor",
+                    purpose="Apply resulting changes",
+                    payload_hint="Use ruling and current world state",
+                )
+            ],
+            reasoning="Legal movement.",
+            suggested_alternatives=[],
+        )
+        extractor_payload = TableOrchestrator.build_extractor_payload(world, adjudication)
+        extractor_json = json.loads(extractor_payload)
+        assert extractor_json["world_state"]["game_session_id"] == world.game_session_id
+
+        extractor_agent = BaseAgent(agent_type="extractor", agent_name="Extractor")
+        extractor_path = extractor_agent._build_trace_file_path("system", extractor_payload)
+        assert extractor_path.name == f"s_{world.game_session_id}_t_{world.turn_count:04d}_a_extractor.json"
+
+
 if __name__ == "__main__":
     test_prompt_loader()
     test_base_agent_initialization()
     test_base_agent_extractor()
+    test_trace_file_path_uses_session_metadata_from_payloads()
     print("\n✅ All agent tests passed!")

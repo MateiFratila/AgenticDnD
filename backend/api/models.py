@@ -14,7 +14,7 @@ class ActionRequest(BaseModel):
 class ActionResponse(BaseModel):
     """Response model for successful action processing."""
 
-    status: str = Field(..., description="approved, rejected, or needs_clarification")
+    status: str = Field(..., description="approved, rejected, needs_clarification, or game_start")
     ruling: str = Field(..., description="DM ruling text")
     actor_id: str = Field(..., description="Character who took the action")
     awaiting_actor_id: str = Field(..., description="Character waiting for next input")

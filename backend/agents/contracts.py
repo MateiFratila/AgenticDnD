@@ -30,7 +30,7 @@ class AdjudicatorResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["approved", "rejected", "needs_clarification"]
+    status: Literal["approved", "rejected", "needs_clarification", "game_start"]
     ruling: str = Field(min_length=1)
     destination: list[DestinationRoute] = Field(min_length=1)
     reasoning: str = Field(min_length=1)
