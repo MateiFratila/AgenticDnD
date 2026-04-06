@@ -340,6 +340,7 @@ class AdventureLoader:
                 ac=npc_data["ac"],
                 position=npc_data["position"],
                 role=npc_data["role"],
+                conditions=npc_data.get("conditions", []),
                 is_alive=npc_data.get("is_alive", True),
                 morale=npc_data.get("morale", 0),
             )

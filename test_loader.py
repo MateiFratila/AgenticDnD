@@ -155,6 +155,51 @@ def test_load_sunken_grotto():
         print("✓ Dispatcher mutation array check passed")
 
 
+def test_dispatcher_can_apply_conditions_to_npcs():
+    """Dispatcher should support add/remove condition mutations for NPC targets."""
+    assets_dir = Path(__file__).parent / "assets"
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=[
+                "pc_aldric_stonehammer.json",
+                "pc_sylara_nightveil.json",
+            ],
+            rules_file="homebrew_rules.json",
+        )
+
+        dispatcher = WorldStateDispatcher()
+        goblin_id = "encounter_1_enemy_0"
+
+        stunned_world = dispatcher.apply_mutations(
+            world,
+            [
+                WorldMutation(
+                    type=MutationType.ADD_CONDITION,
+                    target_id=goblin_id,
+                    condition="stunned",
+                )
+            ],
+        )
+        assert "stunned" in stunned_world.npcs[goblin_id].conditions
+
+        recovered_world = dispatcher.apply_mutations(
+            stunned_world,
+            [
+                WorldMutation(
+                    type=MutationType.REMOVE_CONDITION,
+                    target_id=goblin_id,
+                    condition="stunned",
+                )
+            ],
+        )
+        assert "stunned" not in recovered_world.npcs[goblin_id].conditions
+        print("✓ Dispatcher supports NPC condition mutations")
+
+
 def test_loader_restore_snapshot_or_initialize_new():
     """Loader should restore latest session snapshot, else initialize a new world."""
     assets_dir = Path(__file__).parent / "assets"
@@ -209,5 +254,6 @@ def test_loader_restore_snapshot_or_initialize_new():
 
 if __name__ == "__main__":
     test_load_sunken_grotto()
+    test_dispatcher_can_apply_conditions_to_npcs()
     test_loader_restore_snapshot_or_initialize_new()
     print("\n✅ All checks passed!")

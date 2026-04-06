@@ -146,16 +146,30 @@ class WorldStateDispatcher:
             raise DispatchError("add_condition requires target_id")
         if not mutation.condition:
             raise DispatchError("add_condition requires condition")
-        pc = world.party[mutation.target_id]
-        return world.update_pc(mutation.target_id, pc.add_condition(mutation.condition))
+
+        if mutation.target_id in world.party:
+            pc = world.party[mutation.target_id]
+            return world.update_pc(mutation.target_id, pc.add_condition(mutation.condition))
+        if mutation.target_id in world.npcs:
+            npc = world.npcs[mutation.target_id]
+            return world.update_npc(mutation.target_id, npc.add_condition(mutation.condition))
+
+        raise DispatchError(f"Unknown target id: {mutation.target_id}")
 
     def _apply_remove_condition(self, world: WorldState, mutation: WorldMutation) -> WorldState:
         if not mutation.target_id:
             raise DispatchError("remove_condition requires target_id")
         if not mutation.condition:
             raise DispatchError("remove_condition requires condition")
-        pc = world.party[mutation.target_id]
-        return world.update_pc(mutation.target_id, pc.remove_condition(mutation.condition))
+
+        if mutation.target_id in world.party:
+            pc = world.party[mutation.target_id]
+            return world.update_pc(mutation.target_id, pc.remove_condition(mutation.condition))
+        if mutation.target_id in world.npcs:
+            npc = world.npcs[mutation.target_id]
+            return world.update_npc(mutation.target_id, npc.remove_condition(mutation.condition))
+
+        raise DispatchError(f"Unknown target id: {mutation.target_id}")
 
     def _apply_set_encounter_active(self, world: WorldState, mutation: WorldMutation) -> WorldState:
         if not mutation.encounter_id:

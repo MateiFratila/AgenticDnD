@@ -92,6 +92,7 @@ class NPCState:
     ac: int
     position: str  # room_id
     role: str  # e.g., "warlord", "mercenary", "guard"
+    conditions: List[str] = field(default_factory=list)  # e.g., ["prone", "stunned"]
     is_alive: bool = True
     morale: int = 0  # -2 to 2 scale for tactical behavior
 
@@ -114,6 +115,17 @@ class NPCState:
     def move_to(self, room_id: str) -> "NPCState":
         """Move to a room. Returns updated NPCState."""
         return replace(self, position=room_id)
+
+    def add_condition(self, condition: str) -> "NPCState":
+        """Add a condition. Returns updated NPCState."""
+        if condition not in self.conditions:
+            return replace(self, conditions=[*self.conditions, condition])
+        return self
+
+    def remove_condition(self, condition: str) -> "NPCState":
+        """Remove a condition. Returns updated NPCState."""
+        new_conditions = [c for c in self.conditions if c != condition]
+        return replace(self, conditions=new_conditions)
 
 
 @dataclass(frozen=True)

@@ -60,6 +60,10 @@ Architecture notes: [docs/architecture.md](docs/architecture.md)
 	`python -m backend.orchestrator.snapshot_tools diff-latest`
 - Diff the latest two snapshots from a custom directory:
 	`python -m backend.orchestrator.snapshot_tools diff-latest --dir <path>`
+- List current-session snapshots over HTTP:
+	`GET /api/snapshots`
+- Diff the latest two current-session snapshots over HTTP:
+	`GET /api/snapshots/diff-latest`
 
 ## Tooling Overview
 
@@ -90,6 +94,7 @@ What it does:
 - Loads snapshot JSON.
 - Produces readable flattened diffs between snapshots.
 - Supports automatic latest-to-latest diff with `diff-latest`.
+- Shares snapshot persistence/listing helpers with the orchestrator and REST API.
 
 ### Adventure Loader
 
@@ -108,7 +113,7 @@ File: `backend/main.py` (app factory) and `backend/api/` (routes and models)
 What it does:
 - Wraps `TableOrchestrator` in a FastAPI application.
 - Initializes the game engine on startup (loads world from snapshots or assets, creates agents, starts orchestrator).
-- Exposes POST `/api/advance` to process player actions and GET `/api/rewind` to drop the newest snapshot and restore the previous one for the active session.
+- Exposes POST `/api/advance` to process player actions, GET `/api/rewind` to drop the newest snapshot and restore the previous one, and snapshot inspection endpoints at `GET /api/snapshots` and `GET /api/snapshots/diff-latest`.
 - Routes actions through Adjudicator/Extractor layers and applies mutations to world state.
 - Persists snapshots after each turn.
 - Supports questions (answered without turn advance) and action intents (approved/rejected, may advance turn).
@@ -161,6 +166,7 @@ Covers:
 - Actor turn validation (reject actions from non-active actor).
 - Approved and rejected action flows via HTTP POST.
 - Rewind behavior that deletes the newest session snapshot and reloads the previous one.
+- Snapshot listing and latest-diff inspection over HTTP.
 - World state persistence across requests.
 - Error handling and graceful fallback responses.
 

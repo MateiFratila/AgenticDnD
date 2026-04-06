@@ -28,5 +28,7 @@
 ## Conventions
 - Log turn activity with clear prefixes (`[AGENT]`, `[MEMORY]`, `[DM]`, `[WORLD]`).
 - Keep tool interfaces stable and serializable (Pydantic models).
+- Always confirm architectural decisions with the user before implementation, especially for world-state schema, payload shape, and turn loop flow.
+- For prompt shaping, follow the `prompt-optimization` skill in `.github/skills/prompt-optimization/SKILL.md` to ensure clear objectives, constraints, and output contracts.
 - For world-state schema, payload-scoping, turn-history, or trace-metadata changes, consult the `world-state` skill in `.github/skills/world-state/SKILL.md`.
 - Handle missing OpenAI credentials gracefully with deterministic fallback behavior.

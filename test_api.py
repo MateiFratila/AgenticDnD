@@ -396,3 +396,76 @@ def test_api_rewind_deletes_latest_snapshot_and_reloads_previous(monkeypatch):
         assert data["session_id"] == "abcde"
         assert latest_snapshot.exists() is False
         assert routes.get_orchestrator() is restored_orchestrator
+
+
+def test_api_snapshot_list_endpoint(monkeypatch):
+    """GET /api/snapshots should expose the current session snapshot list over HTTP."""
+    from backend.api import routes
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    from backend.api import router
+
+    app.include_router(router)
+    client = TestClient(app)
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        first = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
+        second = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        first.write_text("{}", encoding="utf-8")
+        second.write_text("{}", encoding="utf-8")
+
+        monkeypatch.setattr(routes, "_snapshot_dir", lambda: snapshot_dir)
+        set_orchestrator(SimpleNamespace(world=SimpleNamespace(game_session_id="abcde")), "abcde")
+
+        response = client.get("/api/snapshots")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["session_id"] == "abcde"
+        assert data["snapshot_count"] == 2
+        assert {Path(name).name for name in data["snapshots"]} == {first.name, second.name}
+
+
+def test_api_snapshot_diff_latest_endpoint(monkeypatch):
+    """GET /api/snapshots/diff-latest should diff the newest two session snapshots over HTTP."""
+    from backend.api import routes
+    from fastapi import FastAPI
+    import os
+    import time
+
+    app = FastAPI()
+    from backend.api import router
+
+    app.include_router(router)
+    client = TestClient(app)
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+        older = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
+        newer = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        older.write_text(json.dumps({"turn_count": 0}), encoding="utf-8")
+        newer.write_text(json.dumps({"turn_count": 1}), encoding="utf-8")
+
+        now = time.time()
+        os.utime(older, (now - 10, now - 10))
+        os.utime(newer, (now, now))
+
+        monkeypatch.setattr(routes, "_snapshot_dir", lambda: snapshot_dir)
+        set_orchestrator(SimpleNamespace(world=SimpleNamespace(game_session_id="abcde")), "abcde")
+
+        response = client.get("/api/snapshots/diff-latest")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["session_id"] == "abcde"
+        assert data["old_snapshot"] == older.name
+        assert data["new_snapshot"] == newer.name
+        assert any("~ turn_count" in line for line in data["diffs"])

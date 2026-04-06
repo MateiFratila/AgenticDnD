@@ -7,13 +7,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .snapshot_store import list_world_snapshots
+
 
 def list_snapshot_files(snapshot_dir: str | Path = "artifacts/world_snapshots") -> list[Path]:
     """Return snapshot files sorted by filename."""
-    base_dir = Path(snapshot_dir)
-    if not base_dir.exists():
-        return []
-    return sorted(base_dir.glob("*loop_*.json"))
+    return list_world_snapshots(snapshot_dir, newest_first=False)
 
 
 def load_snapshot(snapshot_path: str | Path) -> dict[str, Any]:

@@ -61,9 +61,9 @@ class BaseAgent(ABC):
         return token or fallback
 
     def _build_trace_file_path(self, prompt_name: str, user_input: str) -> Path:
-        """Build a short trace file path: s_<nr>_t_<nr>_a_<agent>.json."""
+        """Build a short trace file path: s_<nr>_l_<nr>_a_<agent>.json."""
         session_id = "unknown"
-        turn_count = "unknown"
+        loop_index = "unknown"
 
         try:
             payload = json.loads(user_input)
@@ -75,20 +75,24 @@ class BaseAgent(ABC):
             raw_session_id = world_state.get("game_session_id") or session.get("game_session_id")
             session_id = self._sanitize_token(raw_session_id)
 
-            raw_turn = world_state.get("turn_count")
-            if raw_turn is None:
-                raw_turn = session.get("turn_count")
+            raw_loop = world_state.get("loop_index")
+            if raw_loop is None:
+                raw_loop = session.get("loop_index")
+            if raw_loop is None:
+                raw_loop = world_state.get("turn_count")
+            if raw_loop is None:
+                raw_loop = session.get("turn_count")
 
-            if isinstance(raw_turn, int):
-                turn_count = f"{raw_turn:04d}"
-            elif isinstance(raw_turn, str) and raw_turn.isdigit():
-                turn_count = f"{int(raw_turn):04d}"
+            if isinstance(raw_loop, int):
+                loop_index = f"{raw_loop:04d}"
+            elif isinstance(raw_loop, str) and raw_loop.isdigit():
+                loop_index = f"{int(raw_loop):04d}"
         except Exception:
             # Non-JSON payloads still produce a stable fallback filename.
             pass
 
         agent = self._sanitize_token(self.agent_type)
-        return self._llm_trace_dir / f"s_{session_id}_t_{turn_count}_a_{agent}.json"
+        return self._llm_trace_dir / f"s_{session_id}_l_{loop_index}_a_{agent}.json"
 
     def _persist_llm_trace(
         self,

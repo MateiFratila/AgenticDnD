@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, status
 
 from backend.agents import BaseAgent
 from backend.api.models import ActionRequest, OutcomeResponse, ActionResponse
+from backend.orchestrator.snapshot_store import clear_world_snapshots, list_world_snapshots
+from backend.orchestrator.snapshot_tools import diff_snapshot_files
 from backend.orchestrator.table_orchestrator import TableOrchestrator
 from backend.world import AdventureLoader
 
@@ -33,27 +35,12 @@ def _assets_dir() -> Path:
 
 def _clear_world_snapshots(snapshot_dir: Path) -> int:
     """Delete all persisted world snapshot files and return deleted count."""
-    if not snapshot_dir.exists():
-        return 0
-
-    deleted_count = 0
-    for snapshot_path in snapshot_dir.glob("*loop_*.json"):
-        snapshot_path.unlink()
-        deleted_count += 1
-    return deleted_count
+    return clear_world_snapshots(snapshot_dir)
 
 
 def _list_world_snapshots(snapshot_dir: Path, session_id: str | None = None) -> list[Path]:
     """Return session snapshots ordered newest-first by modification time."""
-    if not snapshot_dir.exists():
-        return []
-
-    pattern = f"session_{session_id}_loop_*.json" if session_id else "*loop_*.json"
-    return sorted(
-        snapshot_dir.glob(pattern),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
+    return list_world_snapshots(snapshot_dir, session_id=session_id, newest_first=True)
 
 
 def _build_fresh_orchestrator(
@@ -195,6 +182,60 @@ async def rewind_game() -> dict:
         }
     except Exception as e:
         logger.error("[API] Error rewinding game: %s", str(e), exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/snapshots")
+async def list_snapshots(session_id: str | None = None) -> dict:
+    """List persisted world snapshots for the active or requested session."""
+    try:
+        orchestrator = get_orchestrator()
+        resolved_session_id = session_id or _state.get("session_id") or orchestrator.world.game_session_id
+        snapshots = _list_world_snapshots(_snapshot_dir(), session_id=resolved_session_id)
+
+        return {
+            "success": True,
+            "session_id": resolved_session_id,
+            "snapshot_count": len(snapshots),
+            "snapshots": [path.name for path in snapshots],
+        }
+    except Exception as e:
+        logger.error("[API] Error listing snapshots: %s", str(e), exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/snapshots/diff-latest")
+async def diff_latest_snapshots(session_id: str | None = None) -> dict:
+    """Diff the newest two snapshots for the active or requested session."""
+    try:
+        orchestrator = get_orchestrator()
+        resolved_session_id = session_id or _state.get("session_id") or orchestrator.world.game_session_id
+        snapshots = _list_world_snapshots(_snapshot_dir(), session_id=resolved_session_id)
+
+        if len(snapshots) < 2:
+            return {
+                "success": False,
+                "session_id": resolved_session_id,
+                "error": (
+                    f"Cannot diff latest snapshots for session {resolved_session_id}: "
+                    f"at least 2 snapshots are required, found {len(snapshots)}."
+                ),
+            }
+
+        new_snapshot = snapshots[0]
+        old_snapshot = snapshots[1]
+        diffs = diff_snapshot_files(old_snapshot, new_snapshot)
+
+        return {
+            "success": True,
+            "session_id": resolved_session_id,
+            "old_snapshot": old_snapshot.name,
+            "new_snapshot": new_snapshot.name,
+            "diff_count": len(diffs),
+            "diffs": diffs,
+        }
+    except Exception as e:
+        logger.error("[API] Error diffing latest snapshots: %s", str(e), exc_info=True)
         return {"success": False, "error": str(e)}
 
 

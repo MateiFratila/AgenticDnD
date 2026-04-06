@@ -106,8 +106,9 @@ def test_base_agent_fallback_when_llm_content_is_none(monkeypatch):
 
 
 def test_trace_file_path_uses_session_metadata_from_payloads():
-    """Trace filenames should use real session/turn values for both payload shapes."""
+    """Trace filenames should use real session/loop values for both payload shapes."""
     assets_dir = Path(__file__).parent / "assets"
+    loop_index = 7
     with TemporaryDirectory() as temp_dir:
         snapshot_dir = Path(temp_dir) / "snapshots"
         loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
@@ -121,10 +122,11 @@ def test_trace_file_path_uses_session_metadata_from_payloads():
             world,
             "aldric_stonehammer",
             "Adventure Start",
+            loop_index=loop_index,
         )
         adjudicator_agent = BaseAgent(agent_type="adjudicator", agent_name="Adjudicator")
         adjudicator_path = adjudicator_agent._build_trace_file_path("system", adjudicator_payload)
-        assert adjudicator_path.name == f"s_{world.game_session_id}_t_{world.turn_count:04d}_a_adjudicator.json"
+        assert adjudicator_path.name == f"s_{world.game_session_id}_l_{loop_index:04d}_a_adjudicator.json"
 
         adjudication = AdjudicatorResponse(
             status="approved",
@@ -139,13 +141,18 @@ def test_trace_file_path_uses_session_metadata_from_payloads():
             reasoning="Legal movement.",
             suggested_alternatives=[],
         )
-        extractor_payload = TableOrchestrator.build_extractor_payload(world, adjudication)
+        extractor_payload = TableOrchestrator.build_extractor_payload(
+            world,
+            adjudication,
+            loop_index=loop_index,
+        )
         extractor_json = json.loads(extractor_payload)
         assert extractor_json["world_state"]["game_session_id"] == world.game_session_id
+        assert extractor_json["world_state"]["session"]["loop_index"] == loop_index
 
         extractor_agent = BaseAgent(agent_type="extractor", agent_name="Extractor")
         extractor_path = extractor_agent._build_trace_file_path("system", extractor_payload)
-        assert extractor_path.name == f"s_{world.game_session_id}_t_{world.turn_count:04d}_a_extractor.json"
+        assert extractor_path.name == f"s_{world.game_session_id}_l_{loop_index:04d}_a_extractor.json"
 
 
 if __name__ == "__main__":

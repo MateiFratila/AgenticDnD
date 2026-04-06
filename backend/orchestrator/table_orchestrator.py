@@ -2,51 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from enum import Enum
-import json
 import logging
 from pathlib import Path
 from typing import Callable, Protocol
 
 from backend.agents.contracts import AdjudicatorResponse, ExtractorMutation, ExtractorResponse
+from backend.orchestrator.payload_builders import (
+    build_adjudicator_payload as build_adjudicator_payload_from_world,
+    build_extractor_payload as build_extractor_payload_from_world,
+)
+from backend.orchestrator.snapshot_store import next_loop_index, persist_world_snapshot
+from backend.orchestrator.turn_models import TableEvent, TableStep, TurnResult
 from backend.world import WorldMutation, WorldState, WorldStateDispatcher
 
 
 logger = logging.getLogger(__name__)
-
-
-class TableStep(str, Enum):
-    """State machine steps for a single table turn."""
-
-    WAITING_FOR_INTENT = "waiting_for_intent"
-    ADJUDICATING = "adjudicating"
-    EXTRACTING = "extracting"
-    APPLYING_MUTATIONS = "applying_mutations"
-    TURN_COMPLETE = "turn_complete"
-
-
-@dataclass(frozen=True)
-class TableEvent:
-    """Structured orchestrator event for transition/debug logging."""
-
-    from_step: TableStep
-    to_step: TableStep
-    actor_id: str
-    detail: str
-
-
-@dataclass(frozen=True)
-class TurnResult:
-    """Result of one orchestrator turn cycle."""
-
-    status: str
-    ruling: str
-    actor_id: str
-    awaiting_actor_id: str
-    advanced_turn: bool
-    applied_mutation_count: int
-    events: list[TableEvent] = field(default_factory=list)
 
 
 AdjudicatorFn = Callable[[WorldState, str, str], AdjudicatorResponse]
@@ -111,23 +81,33 @@ class TableOrchestrator:
         snapshot_dir: str | Path | None = "artifacts/world_snapshots",
     ) -> "TableOrchestrator":
         """Create orchestrator using agent wrappers instead of raw callback functions."""
+        orchestrator: TableOrchestrator | None = None
 
         def adjudicator_fn(
             current_world: WorldState,
             actor_id: str,
             action_text: str,
         ) -> AdjudicatorResponse:
-            payload = cls.build_adjudicator_payload(current_world, actor_id, action_text)
+            payload = cls.build_adjudicator_payload(
+                current_world,
+                actor_id,
+                action_text,
+                loop_index=orchestrator.loop_index if orchestrator is not None else None,
+            )
             return adjudicator_agent.think_adjudication(user_input=payload)
 
         def extractor_fn(
             current_world: WorldState,
             adjudication: AdjudicatorResponse,
         ) -> ExtractorResponse:
-            payload = cls.build_extractor_payload(current_world, adjudication)
+            payload = cls.build_extractor_payload(
+                current_world,
+                adjudication,
+                loop_index=orchestrator.loop_index if orchestrator is not None else None,
+            )
             return extractor_agent.think_extraction(user_input=payload)
 
-        return cls(
+        orchestrator = cls(
             world=world,
             turn_order=turn_order,
             adjudicator_fn=adjudicator_fn,
@@ -135,6 +115,7 @@ class TableOrchestrator:
             dispatcher=dispatcher,
             snapshot_dir=snapshot_dir,
         )
+        return orchestrator
 
     @property
     def current_actor_id(self) -> str:
@@ -145,6 +126,7 @@ class TableOrchestrator:
         """Process one player intent and return turn outcome with transition events."""
         # Always read the acting actor from world state — it is the single source of truth.
         actor_id = self.world.active_actor_id or self.current_actor_id
+        self.loop_index = self._next_loop_index()
         events: list[TableEvent] = []
 
         # Mark actor as active in world state before any LLM call.
@@ -297,37 +279,18 @@ class TableOrchestrator:
 
     def _persist_world_snapshot(self, actor_id: str) -> None:
         """Persist current world state to disk for post-turn inspection."""
-        if self.snapshot_dir is None:
-            return
-
-        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
-        self.loop_index = self._next_loop_index()
-        file_path = self.snapshot_dir / (
-            f"session_{self.world.game_session_id}_"
-            f"loop_{self.loop_index:04d}_"
-            f"turn_{self.world.turn_count:04d}_"
-            f"v_{self.world.world_version:04d}_"
-            f"actor_{actor_id}.json"
+        if self.loop_index <= 0:
+            self.loop_index = self._next_loop_index()
+        persist_world_snapshot(
+            self.world,
+            actor_id=actor_id,
+            snapshot_dir=self.snapshot_dir,
+            loop_index=self.loop_index,
         )
-        file_path.write_text(json.dumps(asdict(self.world), indent=2), encoding="utf-8")
-        logger.info("[TABLE] Snapshot persisted | path=%s", file_path)
 
     def _next_loop_index(self) -> int:
         """Find the next loop index for this game session."""
-        if self.snapshot_dir is None or not self.snapshot_dir.exists():
-            return 1
-
-        prefix = f"session_{self.world.game_session_id}_loop_"
-        max_loop = 0
-        for snapshot_path in self.snapshot_dir.glob(f"session_{self.world.game_session_id}_loop_*.json"):
-            name = snapshot_path.name
-            if not name.startswith(prefix):
-                continue
-            loop_token = name[len(prefix): len(prefix) + 4]
-            if loop_token.isdigit():
-                max_loop = max(max_loop, int(loop_token))
-
-        return max_loop + 1
+        return next_loop_index(self.snapshot_dir, self.world.game_session_id)
 
     def _advance_turn(self) -> None:
         """Move to the next actor in turn order."""
@@ -417,282 +380,29 @@ class TableOrchestrator:
         )
 
     @staticmethod
-    def _summarize_party_member(pc: object) -> dict:
-        """Return compact PC context suitable for LLM decision-making."""
-        return {
-            "id": pc.id,
-            "name": pc.name,
-            "race": pc.race,
-            "class": pc.char_class,
-            "level": pc.level,
-            "hp_current": pc.hp_current,
-            "hp_max": pc.hp_max,
-            "ac": pc.ac,
-            "position": pc.position,
-            "conditions": pc.conditions,
-            "is_alive": pc.is_alive,
-        }
-
-    @staticmethod
-    def _summarize_npc(npc: object) -> dict:
-        """Return compact NPC context for the adjudicator's current scene."""
-        return {
-            "id": npc.id,
-            "name": npc.name,
-            "type": npc.npc_type,
-            "role": npc.role,
-            "position": npc.position,
-            "hp_current": npc.hp_current,
-            "hp_max": npc.hp_max,
-            "ac": npc.ac,
-            "is_alive": npc.is_alive,
-            "morale": npc.morale,
-        }
-
-    @staticmethod
-    def _summarize_room(room: object) -> dict:
-        """Return compact room context for scoped adjudicator prompts."""
-        return {
-            "room_id": room.id,
-            "room_name": room.name,
-            "is_visited": room.is_visited,
-            "is_cleared": room.is_cleared,
-            "trap_disarmed": room.trap_disarmed,
-            "connections": getattr(room, "connections", []),
-            "pc_ids": room.pc_ids,
-            "npc_ids": room.npc_ids,
-        }
-
-    @staticmethod
-    def _summarize_encounter(encounter: object) -> dict:
-        """Return compact encounter context for scoped LLM payloads."""
-        return {
-            "id": encounter.id,
-            "name": encounter.name,
-            "room_id": encounter.room_id,
-            "is_active": encounter.is_active,
-            "is_cleared": encounter.is_cleared,
-            "round_count": encounter.round_count,
-            "npc_ids": encounter.npc_ids,
-        }
-
-    @classmethod
-    def _build_adjudicator_world_view(cls, world: WorldState, actor_id: str) -> dict:
-        """Build a scoped world snapshot focused on the acting PC and current scene."""
-        actor = world.party.get(actor_id)
-        actor_room_id = actor.position if actor is not None else None
-        active_encounter = (
-            world.encounters.get(world.active_encounter_id)
-            if world.active_encounter_id is not None
-            else None
+    def build_adjudicator_payload(
+        world: WorldState,
+        actor_id: str,
+        action_text: str,
+        loop_index: int | None = None,
+    ) -> str:
+        """Build the adjudicator payload from a scoped world-state view."""
+        return build_adjudicator_payload_from_world(
+            world,
+            actor_id,
+            action_text,
+            loop_index=loop_index,
         )
-
-        visible_npcs = {
-            npc_id: cls._summarize_npc(npc)
-            for npc_id, npc in world.npcs.items()
-            if npc.position == actor_room_id
-            or (
-                active_encounter is not None
-                and npc_id in active_encounter.npc_ids
-            )
-        }
-
-        relevant_room_ids = {
-            pc.position
-            for pc in world.party.values()
-            if pc.position
-        }
-        if actor_room_id:
-            relevant_room_ids.add(actor_room_id)
-        if active_encounter is not None and active_encounter.room_id:
-            relevant_room_ids.add(active_encounter.room_id)
-
-        rooms_of_interest = {
-            room_id: cls._summarize_room(room)
-            for room_id, room in world.rooms.items()
-            if room_id in relevant_room_ids
-        }
-
-        current_room = world.rooms.get(actor_room_id) if actor_room_id else None
-        active_objectives = {
-            obj_id: {
-                "goal": obj.goal,
-                "is_completed": obj.is_completed,
-                "is_failed": obj.is_failed,
-            }
-            for obj_id, obj in world.objectives.items()
-            if not obj.is_completed and not obj.is_failed
-        }
-
-        if not active_objectives:
-            active_objectives = {
-                obj_id: {
-                    "goal": obj.goal,
-                    "is_completed": obj.is_completed,
-                    "is_failed": obj.is_failed,
-                }
-                for obj_id, obj in world.objectives.items()
-            }
-
-        return {
-            "scope": "adjudicator_view",
-            "adventure_title": world.adventure_title,
-            "session": {
-                "game_session_id": world.game_session_id,
-                "turn_count": world.turn_count,
-                "world_version": world.world_version,
-                "active_actor_id": world.active_actor_id,
-                "awaiting_input_from": world.awaiting_input_from,
-                "active_encounter_id": world.active_encounter_id,
-            },
-            "actor": (
-                cls._summarize_party_member(actor)
-                if actor is not None
-                else {"id": actor_id, "position": actor_room_id}
-            ),
-            "party": {
-                pc_id: cls._summarize_party_member(pc)
-                for pc_id, pc in world.party.items()
-            },
-            "current_scene": {
-                "room_id": current_room.id if current_room is not None else actor_room_id,
-                "room_name": current_room.name if current_room is not None else actor_room_id,
-                "is_visited": current_room.is_visited if current_room is not None else False,
-                "is_cleared": current_room.is_cleared if current_room is not None else False,
-                "trap_disarmed": current_room.trap_disarmed if current_room is not None else None,
-                "connections": current_room.connections if current_room is not None else [],
-                "party_members_here": [
-                    pc_id
-                    for pc_id, pc in world.party.items()
-                    if pc.position == actor_room_id
-                ],
-                "visible_npcs": visible_npcs,
-            },
-            "rooms_of_interest": rooms_of_interest,
-            "active_encounter": (
-                cls._summarize_encounter(active_encounter)
-                if active_encounter is not None
-                else None
-            ),
-            "active_objectives": active_objectives,
-            "relevant_rules": world.homebrew_rules,
-            "recent_turn_log": world.turn_log[-8:],
-            "world_summary": {
-                "party_count": len(world.party),
-                "npc_count": len(world.npcs),
-                "room_count": len(world.rooms),
-                "encounter_count": len(world.encounters),
-                "objective_count": len(world.objectives),
-                "omitted_sections": [
-                    "distant_npc_details",
-                    "inactive_encounter_blobs",
-                    "full_world_state_dump",
-                ],
-            },
-        }
-
-    @classmethod
-    def build_adjudicator_payload(cls, world: WorldState, actor_id: str, action_text: str) -> str:
-        """Helper to build adjudicator payload with scoped world state context."""
-        payload = {
-            "actor_id": actor_id,
-            "action": action_text,
-            "world_state": cls._build_adjudicator_world_view(world, actor_id),
-        }
-        return json.dumps(payload, indent=2)
 
     @staticmethod
     def build_extractor_payload(
         world: WorldState,
         adjudication: AdjudicatorResponse,
+        loop_index: int | None = None,
     ) -> str:
-        """Helper to build extractor payload with ruling and world context."""
-        active_encounter = (
-            world.encounters.get(world.active_encounter_id)
-            if world.active_encounter_id is not None
-            else None
+        """Build the extractor payload from the current world state and ruling."""
+        return build_extractor_payload_from_world(
+            world,
+            adjudication,
+            loop_index=loop_index,
         )
-        active_actor = world.party.get(world.active_actor_id) if world.active_actor_id else None
-        current_room = world.rooms.get(active_actor.position) if active_actor and active_actor.position else None
-
-        relevant_room_ids = {
-            pc.position
-            for pc in world.party.values()
-            if pc.position in world.rooms
-        }
-        if current_room is not None:
-            relevant_room_ids.add(current_room.id)
-        if active_encounter is not None and active_encounter.room_id in world.rooms:
-            relevant_room_ids.add(active_encounter.room_id)
-
-        for room_id in list(relevant_room_ids):
-            room = world.rooms.get(room_id)
-            if room is None:
-                continue
-            for connection in getattr(room, "connections", []):
-                destination = connection.get("destination")
-                if destination in world.rooms:
-                    relevant_room_ids.add(destination)
-
-        npcs_of_interest = {
-            npc_id: TableOrchestrator._summarize_npc(npc)
-            for npc_id, npc in world.npcs.items()
-            if npc.position in relevant_room_ids
-            or (
-                active_encounter is not None
-                and npc_id in active_encounter.npc_ids
-            )
-        }
-        encounters_of_interest = {
-            encounter_id: TableOrchestrator._summarize_encounter(encounter)
-            for encounter_id, encounter in world.encounters.items()
-            if encounter.room_id in relevant_room_ids
-            or encounter_id == world.active_encounter_id
-        }
-
-        payload = {
-            "adjudication": adjudication.model_dump(),
-            "world_state": {
-                "game_session_id": world.game_session_id,
-                "active_encounter_id": world.active_encounter_id,
-                "turn_count": world.turn_count,
-                "session": {
-                    "game_session_id": world.game_session_id,
-                    "turn_count": world.turn_count,
-                    "world_version": world.world_version,
-                    "active_actor_id": world.active_actor_id,
-                    "awaiting_input_from": world.awaiting_input_from,
-                },
-                "party": {
-                    pc_id: {
-                        "name": pc.name,
-                        "position": pc.position,
-                        "hp_current": pc.hp_current,
-                        "hp_max": pc.hp_max,
-                        "conditions": pc.conditions,
-                    }
-                    for pc_id, pc in world.party.items()
-                },
-                "current_scene": {
-                    "room_id": current_room.id if current_room is not None else None,
-                    "room_name": current_room.name if current_room is not None else None,
-                    "connections": current_room.connections if current_room is not None else [],
-                    "pc_ids": current_room.pc_ids if current_room is not None else [],
-                    "npc_ids": current_room.npc_ids if current_room is not None else [],
-                    "visible_npcs": npcs_of_interest,
-                },
-                "rooms_of_interest": {
-                    room_id: TableOrchestrator._summarize_room(room)
-                    for room_id, room in world.rooms.items()
-                    if room_id in relevant_room_ids
-                },
-                "npcs_of_interest": npcs_of_interest,
-                "encounters_of_interest": encounters_of_interest,
-                "active_encounter": (
-                    TableOrchestrator._summarize_encounter(active_encounter)
-                    if active_encounter is not None
-                    else None
-                ),
-            },
-        }
-        return json.dumps(payload, indent=2)
