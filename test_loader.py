@@ -84,6 +84,10 @@ def test_load_sunken_grotto():
         print(f"✓ Objectives: {len(world.objectives)}")
         print(f"✓ Homebrew rules loaded: {len(world.homebrew_rules)} rules")
 
+        first_encounter = world.encounters["encounter_1"]
+        assert first_encounter.turn_order == [], "Fresh encounters should start with an empty turn order"
+        assert first_encounter.current_turn_index == 0, "Fresh encounters should start at turn index 0"
+
         assert len(world.game_session_id) == 5, "Session id should be 5 chars"
 
         # Verify initial placement
@@ -200,6 +204,96 @@ def test_dispatcher_can_apply_conditions_to_npcs():
         print("✓ Dispatcher supports NPC condition mutations")
 
 
+def test_dispatcher_can_add_and_remove_inventory_items():
+    """Dispatcher should support item_add/item_remove for PC and NPC inventories."""
+    assets_dir = Path(__file__).parent / "assets"
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=[
+                "pc_aldric_stonehammer.json",
+                "pc_sylara_nightveil.json",
+            ],
+            rules_file="homebrew_rules.json",
+        )
+
+        dispatcher = WorldStateDispatcher()
+        updated_world = dispatcher.apply_mutations(
+            world,
+            [
+                WorldMutation(
+                    type=MutationType.ITEM_ADD,
+                    target_id="sylara_nightveil",
+                    item="Silver key",
+                ),
+                WorldMutation(
+                    type=MutationType.ITEM_ADD,
+                    target_id="encounter_1_enemy_0",
+                    item="Stolen map scrap",
+                ),
+                WorldMutation(
+                    type=MutationType.ITEM_REMOVE,
+                    target_id="encounter_1_enemy_0",
+                    item="Stolen map scrap",
+                ),
+            ],
+        )
+
+        assert "Silver key" in updated_world.party["sylara_nightveil"].inventory
+        assert "Stolen map scrap" not in updated_world.npcs["encounter_1_enemy_0"].inventory
+        print("✓ Dispatcher supports inventory mutations")
+
+
+def test_dispatcher_clearing_active_encounter_resets_pointer():
+    """Clearing an active encounter should also deactivate it and clear the active encounter pointer."""
+    assets_dir = Path(__file__).parent / "assets"
+
+    with TemporaryDirectory() as temp_dir:
+        snapshot_dir = Path(temp_dir) / "snapshots"
+        loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
+        world = loader.load_adventure(
+            adventure_file="adventure_sunken_grotto.json",
+            pc_files=[
+                "pc_aldric_stonehammer.json",
+                "pc_sylara_nightveil.json",
+            ],
+            rules_file="homebrew_rules.json",
+        )
+
+        dispatcher = WorldStateDispatcher()
+        encounter_id = "encounter_1"
+        world = dispatcher.apply_mutations(
+            world,
+            [
+                WorldMutation(type=MutationType.SET_ACTIVE_ENCOUNTER, encounter_id=encounter_id),
+                WorldMutation(
+                    type=MutationType.SET_ENCOUNTER_ACTIVE,
+                    encounter_id=encounter_id,
+                    is_active=True,
+                ),
+            ],
+        )
+
+        cleared_world = dispatcher.apply_mutations(
+            world,
+            [
+                WorldMutation(
+                    type=MutationType.SET_ENCOUNTER_CLEARED,
+                    encounter_id=encounter_id,
+                    is_cleared=True,
+                )
+            ],
+        )
+
+        assert cleared_world.encounters[encounter_id].is_cleared is True
+        assert cleared_world.encounters[encounter_id].is_active is False
+        assert cleared_world.active_encounter_id is None
+        print("✓ Clearing an encounter resets the active encounter pointer")
+
+
 def test_loader_restore_snapshot_or_initialize_new():
     """Loader should restore latest session snapshot, else initialize a new world."""
     assets_dir = Path(__file__).parent / "assets"
@@ -222,8 +316,12 @@ def test_loader_restore_snapshot_or_initialize_new():
         print("✓ Fresh world initialized with generated session id")
 
         # Branch 2: restore from existing snapshot for that session.
+        restored_seed = fresh_world.update_pc(
+            "sylara_nightveil",
+            fresh_world.party["sylara_nightveil"].add_item("Goblin keyring"),
+        )
         restored_seed = (
-            fresh_world
+            restored_seed
             .increment_turn()
             .add_log_entry("[WORLD] Restored from snapshot")
             .increment_version()
@@ -249,6 +347,7 @@ def test_loader_restore_snapshot_or_initialize_new():
         assert restored_world.turn_count == 1
         assert restored_world.world_version == 1
         assert restored_world.turn_log[-1] == "[WORLD] Restored from snapshot"
+        assert "Goblin keyring" in restored_world.party["sylara_nightveil"].inventory
         print("✓ Existing snapshot restored by game_session_id")
 
 

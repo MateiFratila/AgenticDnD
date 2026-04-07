@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, status
 
 from backend.agents import BaseAgent
-from backend.api.models import ActionRequest, OutcomeResponse, ActionResponse
+from backend.api.models import ActionRequest, OutcomeResponse, ActionResponse, ResolvedActionResponse
 from backend.orchestrator.snapshot_store import clear_world_snapshots, list_world_snapshots
 from backend.orchestrator.snapshot_tools import diff_snapshot_files
 from backend.orchestrator.table_orchestrator import TableOrchestrator
@@ -66,12 +66,17 @@ def _build_fresh_orchestrator(
         agent_type="extractor",
         agent_name="Extractor",
     )
+    intent_agent = BaseAgent(
+        agent_type="intent",
+        agent_name="Intent Generator",
+    )
 
     return TableOrchestrator.from_agents(
         world=world,
         turn_order=list(world.party.keys()),
         adjudicator_agent=adjudicator_agent,
         extractor_agent=extractor_agent,
+        intent_agent=intent_agent,
         snapshot_dir=snapshot_dir,
     )
 
@@ -83,12 +88,23 @@ def set_orchestrator(orchestrator: TableOrchestrator, session_id: str) -> None:
 
 
 def get_orchestrator() -> TableOrchestrator:
-    """Get the active orchestrator, raising if not initialized."""
+    """Get the active orchestrator, lazily bootstrapping it if startup has not run yet."""
     if _state["orchestrator"] is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Game engine not initialized",
-        )
+        try:
+            orchestrator = _build_fresh_orchestrator(
+                _snapshot_dir(),
+                game_session_id=_state.get("session_id"),
+            )
+            set_orchestrator(orchestrator, orchestrator.world.game_session_id)
+            logger.info(
+                "[API] Lazily initialized orchestrator | session_id=%s",
+                orchestrator.world.game_session_id,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Game engine not initialized: {exc}",
+            ) from exc
     return _state["orchestrator"]
 
 
@@ -247,34 +263,68 @@ async def advance_game(request: ActionRequest) -> OutcomeResponse:
     POST body:
     ```json
     {
-      "actor": "aldric_stonehammer",
-      "action": "I swing my sword at the goblin"
+      "actor": {
+        "actor_id": "aldric_stonehammer",
+        "action": "I swing my sword at the goblin"
+      }
     }
     ```
 
-    Returns OutcomeResponse with adjudication status, ruling, and turn state.
-    Not all responses advance the turn (e.g., question answers).
+    Leave `actor.action` blank to have the intent agent propose one for the acting PC.
+    The response also includes `data.actor` as the full normalized `ResolvedAction`, plus
+    `npc_turns` for any NPC actions auto-resolved before control returns.
     """
+    request_actor = request.actor
+    actor_id = request_actor.actor_id
+
     try:
         orchestrator = get_orchestrator()
 
-        if request.actor != orchestrator.world.active_actor_id:
+        if actor_id != orchestrator.world.active_actor_id:
             return OutcomeResponse(
                 success=False,
                 data=None,
-                error=f"It is not {request.actor}'s turn. Waiting for {orchestrator.world.awaiting_input_from}.",
-                actor_id=request.actor,
+                error=f"It is not {actor_id}'s turn. Waiting for {orchestrator.world.awaiting_input_from}.",
+                actor_id=actor_id,
             )
 
-        result = orchestrator.process_intent(request.action)
+        submitted_action = request_actor.action or ""
+        result = orchestrator.process_intent(submitted_action, actor_id=actor_id)
+
+        resolved_action = getattr(result, "resolved_action", None)
+        actor_response = ResolvedActionResponse(
+            actor_id=(resolved_action.actor_id if resolved_action is not None else result.actor_id),
+            action=(resolved_action.action if resolved_action is not None else submitted_action),
+            source=(
+                resolved_action.source
+                if resolved_action is not None
+                else ("player" if submitted_action else "intent_agent")
+            ),
+            in_character_note=(
+                resolved_action.in_character_note if resolved_action is not None else None
+            ),
+            reasoning=(resolved_action.reasoning if resolved_action is not None else None),
+        )
 
         action_response = ActionResponse(
             status=result.status,
             ruling=result.ruling,
+            actor=actor_response,
             actor_id=result.actor_id,
             awaiting_actor_id=result.awaiting_actor_id,
             advanced_turn=result.advanced_turn,
             applied_mutation_count=result.applied_mutation_count,
+            npc_turns=[
+                {
+                    "actor_id": turn.actor_id,
+                    "generated_action": turn.generated_action,
+                    "status": turn.status,
+                    "ruling": turn.ruling,
+                    "advanced_turn": turn.advanced_turn,
+                    "applied_mutation_count": turn.applied_mutation_count,
+                }
+                for turn in result.npc_turns
+            ],
         )
 
         logger.info(
@@ -288,7 +338,7 @@ async def advance_game(request: ActionRequest) -> OutcomeResponse:
             success=True,
             data=action_response,
             error=None,
-            actor_id=request.actor,
+            actor_id=actor_id,
         )
 
     except Exception as e:
@@ -297,7 +347,7 @@ async def advance_game(request: ActionRequest) -> OutcomeResponse:
             success=False,
             data=None,
             error=str(e),
-            actor_id=request.actor,
+            actor_id=actor_id,
         )
 
 

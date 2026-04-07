@@ -15,12 +15,9 @@ class LLMClient:
 
     def __init__(self):
         """Initialize Azure OpenAI client from environment variables."""
-        endpoint = os.getenv(
-            "AZURE_OPENAI_ENDPOINT",
-            "https://dnd-agentic-ai-service.services.ai.azure.com/openai/v1/",
-        )
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT", "Kimi-K2.5")
+        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT")
 
         self.api_key_set = bool(api_key)
         if not api_key:

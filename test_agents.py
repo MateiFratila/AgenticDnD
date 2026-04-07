@@ -30,7 +30,15 @@ def test_prompt_loader():
     extractor_prompt = loader.load_prompt("extractor", "system")
     assert len(extractor_prompt) > 0, "Extractor prompt is empty"
     assert "mutation" in extractor_prompt.lower(), "Extractor prompt missing expected content"
+    assert "item_add" in extractor_prompt, "Extractor prompt should document inventory mutations"
+    assert "looted" in extractor_prompt.lower(), "Extractor prompt should explain how to mark looted corpses"
     print(f"✓ Extractor system prompt loaded: {len(extractor_prompt)} chars")
+
+    # Load intent system prompt
+    intent_prompt = loader.load_prompt("intent", "system")
+    assert len(intent_prompt) > 0, "Intent prompt is empty"
+    assert "intent" in intent_prompt.lower(), "Intent prompt missing expected content"
+    print(f"✓ Intent system prompt loaded: {len(intent_prompt)} chars")
 
 
 def test_base_agent_initialization():
@@ -76,6 +84,23 @@ def test_base_agent_extractor():
     system_prompt = extractor._load_system_prompt()
     assert "mutation" in system_prompt.lower()
     print(f"✓ Extractor agent can load system prompt")
+
+
+def test_base_agent_intent():
+    """Test intent agent initialization."""
+    intent_agent = BaseAgent(
+        agent_type="intent",
+        agent_name="Intent Generator",
+        temperature=0.4,
+        max_tokens=1200,
+    )
+
+    assert intent_agent.agent_type == "intent"
+    assert intent_agent.agent_name == "Intent Generator"
+    system_prompt = intent_agent._load_system_prompt()
+    assert "immediate next step" in system_prompt.lower()
+    assert "roll" in system_prompt.lower()
+    print("✓ Intent agent initialized")
 
 
 def test_base_agent_fallback_when_llm_content_is_none(monkeypatch):
@@ -159,5 +184,6 @@ if __name__ == "__main__":
     test_prompt_loader()
     test_base_agent_initialization()
     test_base_agent_extractor()
+    test_base_agent_intent()
     test_trace_file_path_uses_session_metadata_from_payloads()
     print("\n✅ All agent tests passed!")

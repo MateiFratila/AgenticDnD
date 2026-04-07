@@ -14,8 +14,10 @@ from .contracts import (
     DestinationRoute,
     ExtractorMutation,
     ExtractorResponse,
+    IntentResponse,
     parse_adjudicator_response,
     parse_extractor_response,
+    parse_intent_response,
 )
 from backend.world.mutations import MutationType
 
@@ -71,13 +73,26 @@ class BaseAgent(ABC):
             world_state = world_state if isinstance(world_state, dict) else {}
             session = world_state.get("session", {})
             session = session if isinstance(session, dict) else {}
+            summary = world_state.get("summary", {})
+            summary = summary if isinstance(summary, dict) else {}
+            summary_session = summary.get("session", {})
+            summary_session = summary_session if isinstance(summary_session, dict) else {}
+            canonical = world_state.get("canonical_world_state", {})
+            canonical = canonical if isinstance(canonical, dict) else {}
 
-            raw_session_id = world_state.get("game_session_id") or session.get("game_session_id")
+            raw_session_id = (
+                world_state.get("game_session_id")
+                or session.get("game_session_id")
+                or summary_session.get("game_session_id")
+                or canonical.get("game_session_id")
+            )
             session_id = self._sanitize_token(raw_session_id)
 
             raw_loop = world_state.get("loop_index")
             if raw_loop is None:
                 raw_loop = session.get("loop_index")
+            if raw_loop is None:
+                raw_loop = summary_session.get("loop_index")
             if raw_loop is None:
                 raw_loop = world_state.get("turn_count")
             if raw_loop is None:
@@ -247,6 +262,8 @@ class BaseAgent(ABC):
                 )
             ],
             reasoning="Deterministic fallback response applied due to unavailable/invalid LLM output.",
+            requires_player_response=False,
+            follow_up_actor=None,
             suggested_alternatives=[],
         )
 
@@ -263,6 +280,15 @@ class BaseAgent(ABC):
                     type=MutationType.INCREMENT_TURN,
                 ),
             ]
+        )
+
+    @staticmethod
+    def _fallback_intent_response() -> IntentResponse:
+        """Deterministic intent fallback used when LLM output is unavailable."""
+        return IntentResponse(
+            intent="I take a careful defensive action and reassess the immediate threat.",
+            in_character_note="The actor steadies their breathing and looks for the safest opening.",
+            reasoning="Deterministic fallback response applied due to unavailable or invalid LLM output.",
         )
 
     def think(
@@ -339,3 +365,27 @@ class BaseAgent(ABC):
                 str(exc),
             )
             return self._fallback_extractor_response()
+
+    def think_intent(
+        self,
+        user_input: str,
+        system_prompt: Optional[str] = None,
+        prompt_name: str = "system",
+    ):
+        """Call LLM and return a validated PC/NPC intent response model."""
+        try:
+            raw = self.think(
+                system_prompt=system_prompt,
+                user_input=user_input,
+                prompt_name=prompt_name,
+            )
+            if not raw.strip():
+                raise ValueError("Empty intent response")
+            return parse_intent_response(raw)
+        except Exception as exc:
+            logger.warning(
+                "[%s] Falling back to deterministic intent response: %s",
+                self.agent_name,
+                str(exc),
+            )
+            return self._fallback_intent_response()

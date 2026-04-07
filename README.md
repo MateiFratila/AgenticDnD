@@ -8,10 +8,10 @@ Architecture notes: [docs/architecture.md](docs/architecture.md)
 
 - `assets/`: Adventure data, PCs, and homebrew rules JSON files.
 - `backend/world/`: Immutable world state, snapshot-first loader, mutation schema, dispatcher.
-- `backend/agents/`: Agent base classes and typed response contracts.
+- `backend/agents/`: Agent base classes and typed response contracts, including the PC/NPC intent generator.
 - `backend/llm/`: LLM client and prompt loading utilities.
 - `backend/orchestrator/`: Turn loop orchestrator and snapshot tooling.
-- `backend/prompts/`: System prompts for adjudicator and extractor.
+- `backend/prompts/`: System prompts for intent generation, adjudication, and extraction.
 - `test_*.py`: Script-style test files covering major subsystems.
 
 ## Environment Setup
@@ -72,8 +72,16 @@ Architecture notes: [docs/architecture.md](docs/architecture.md)
 File: `backend/orchestrator/table_orchestrator.py`
 
 What it does:
-- Runs one turn loop: adjudication -> extraction -> mutation application.
-- Builds a scoped adjudicator payload focused on the acting PC, current scene, active objectives, recent turn history, and nearby room connections instead of dumping the full world state.
+- Runs the main turn loop as `intent generation (when needed) -> adjudication -> extraction -> mutation application`.
+- Normalizes both player-submitted text and generated intents into one internal `ResolvedAction` contract before adjudication.
+- Supports deterministic inventory updates through `item_add` and `item_remove` mutations on PC/NPC inventories, so approved loot or item consumption can now persist in snapshots.
+- Treats searched or looted corpses as a simple dead-actor condition (for example `looted`), keeping the state deterministic without introducing a separate corpse object model.
+- Automatically drops back to normal party turn flow when an encounter is marked inactive or cleared, preventing stale encounter pointers from hijacking subsequent turns.
+- Uses encounter-owned combat state (`turn_order`, `current_turn_index`, `round_count`) whenever an encounter is active, instead of relying only on a top-level PC turn pointer.
+- Builds a scoped payload focused on the acting PC or NPC, current scene, active objectives, recent turn history, and nearby room connections instead of dumping the full world state.
+- Automatically generates an action when `/api/advance` receives an empty `action` string for the active PC.
+- Auto-resolves encounter NPC turns through the Intent Agent after a committed PC turn until control returns to the next PC slot, and records compact `npc_turns` summaries for the API response.
+- Uses loop failsafes during NPC auto-resolution (hard turn cap, repeated-state detection, and no-progress detection) to prevent runaway recursion.
 - Keeps the same actor awaited when a ruling asks for an unresolved roll/check, rather than advancing turn prematurely.
 - Records adjudicator rulings into `world.turn_log` so future turns retain DM-facing narrative history, while extractor/world entries can still capture canonical state changes.
 - Stores session metadata in world state (`active_actor_id`, `awaiting_input_from`, `world_version`).
@@ -114,7 +122,10 @@ What it does:
 - Wraps `TableOrchestrator` in a FastAPI application.
 - Initializes the game engine on startup (loads world from snapshots or assets, creates agents, starts orchestrator).
 - Exposes POST `/api/advance` to process player actions, GET `/api/rewind` to drop the newest snapshot and restore the previous one, and snapshot inspection endpoints at `GET /api/snapshots` and `GET /api/snapshots/diff-latest`.
-- Routes actions through Adjudicator/Extractor layers and applies mutations to world state.
+- Accepts a nested payload shaped like `{ "actor": { "actor_id": "...", "action": "..." } }`; `actor.action` may be an empty string or `null`, in which case the intent agent generates the acting PC's next move before adjudication.
+- Returns the full normalized `ResolvedAction` under `data.actor`, so the API echoes back the effective `actor_id`, `action`, `source`, and any optional intent metadata that was actually processed.
+- Includes `npc_turns` in the `/api/advance` response for any NPC actions auto-resolved before control returns to the next PC.
+- Routes actions through Intent/Adjudicator/Extractor layers and applies mutations to world state.
 - Persists snapshots after each turn.
 - Supports questions (answered without turn advance) and action intents (approved/rejected, may advance turn).
 
@@ -125,28 +136,33 @@ What it does:
 Covers:
 - Fresh world initialization from assets when no snapshot exists.
 - Snapshot-first restore behavior (including `game_session_id` filtering).
+- Encounter turn-state scaffolding (`turn_order`, `current_turn_index`) on fresh loads and restores.
 - Immutable update behavior on dataclass state.
-- Deterministic dispatcher mutation application and room membership syncing.
+- Deterministic dispatcher mutation application, including room membership syncing and inventory item add/remove behavior.
 - Cleanup-safe temporary snapshot directories in tests.
 
 ### `test_agents.py`
 
 Covers:
-- Prompt loading for adjudicator and extractor.
-- BaseAgent initialization and configuration.
+- Prompt loading for intent, adjudicator, and extractor.
+- BaseAgent initialization and configuration for all three agent roles.
 - LLM client initialization path.
 
 ### `test_agent_contracts.py`
 
 Covers:
 - Adjudicator response schema parsing and validation.
-- Extractor mutation array schema parsing and validation.
+- Intent response schema parsing and validation.
+- Extractor mutation array schema parsing and validation, including inventory mutations.
 - Rejection/error cases (missing alternatives, invalid mutation values).
 
 ### `test_orchestrator.py`
 
 Covers:
 - Approved turn flow with extractor route and mutation application.
+- Empty-action flow that uses the intent agent to generate a move.
+- Encounter-owned turn order progression, round wrapping, and NPC routing through the intent agent.
+- Safe NPC auto-resolution with failsafe caps and summaries.
 - Rejected flow with no commit.
 - Agent-wrapper (`from_agents`) payload handling.
 - World session metadata updates and turn progression.
@@ -164,6 +180,7 @@ Covers:
 - App lifespan initialization (agent creation, orchestrator setup).
 - Endpoint contract validation and response models.
 - Actor turn validation (reject actions from non-active actor).
+- Nested `/api/advance` actor payload handling, including generated intent flow, normalized `ResolvedAction` serialization under `data.actor`, `npc_turns` serialization, and corpse-looting state represented canonically via dead-target conditions.
 - Approved and rejected action flows via HTTP POST.
 - Rewind behavior that deletes the newest session snapshot and reloads the previous one.
 - Snapshot listing and latest-diff inspection over HTTP.

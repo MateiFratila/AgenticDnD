@@ -34,6 +34,8 @@ class AdjudicatorResponse(BaseModel):
     ruling: str = Field(min_length=1)
     destination: list[DestinationRoute] = Field(min_length=1)
     reasoning: str = Field(min_length=1)
+    requires_player_response: bool = False
+    follow_up_actor: str | None = None
     suggested_alternatives: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -42,6 +44,19 @@ class AdjudicatorResponse(BaseModel):
             raise ValueError("Rejected rulings must include at least one suggested alternative")
         if self.status == "approved" and not any(d.actor == "extractor" for d in self.destination):
             raise ValueError("Approved rulings must route to extractor in destination")
+        if self.follow_up_actor == "extractor":
+            raise ValueError("follow_up_actor must name a responding actor, not 'extractor'")
+        if self.follow_up_actor and not self.requires_player_response:
+            raise ValueError("follow_up_actor requires requires_player_response=True")
+        if self.requires_player_response and self.status in {"approved", "game_start"}:
+            raise ValueError(
+                "Use needs_clarification or rejected when the player must still respond before resolution"
+            )
+        if self.status in {"rejected", "needs_clarification"}:
+            if not self.requires_player_response:
+                raise ValueError(f"{self.status} rulings must set requires_player_response=True")
+            if not self.follow_up_actor and not any(d.actor != "extractor" for d in self.destination):
+                raise ValueError(f"{self.status} rulings must name a follow-up actor in destination or follow_up_actor")
         return self
 
 
@@ -58,10 +73,13 @@ class ExtractorMutation(BaseModel):
     encounter_id: str | None = None
     objective_id: str | None = None
     amount: int | None = None
+    item: str | None = None
     condition: str | None = None
     entry: str | None = None
     is_active: bool | None = None
     is_cleared: bool | None = None
+    turn_index: int | None = None
+    turn_order: list[dict[str, Any]] | None = None
 
     @model_validator(mode="after")
     def _validate_type_requirements(self) -> "ExtractorMutation":
@@ -69,11 +87,16 @@ class ExtractorMutation(BaseModel):
             MutationType.MOVE_ENTITY: ["entity_id", "to_room_id"],
             MutationType.APPLY_DAMAGE: ["target_id", "amount"],
             MutationType.APPLY_HEAL: ["target_id", "amount"],
+            MutationType.ITEM_ADD: ["target_id", "item"],
+            MutationType.ITEM_REMOVE: ["target_id", "item"],
             MutationType.ADD_CONDITION: ["target_id", "condition"],
             MutationType.REMOVE_CONDITION: ["target_id", "condition"],
             MutationType.SET_ACTIVE_ENCOUNTER: ["encounter_id"],
             MutationType.SET_ENCOUNTER_ACTIVE: ["encounter_id", "is_active"],
             MutationType.SET_ENCOUNTER_CLEARED: ["encounter_id", "is_cleared"],
+            MutationType.SET_ENCOUNTER_TURN_ORDER: ["encounter_id", "turn_order"],
+            MutationType.SET_ENCOUNTER_TURN_INDEX: ["encounter_id", "turn_index"],
+            MutationType.ADVANCE_ENCOUNTER_TURN: ["encounter_id"],
             MutationType.MARK_OBJECTIVE_COMPLETE: ["objective_id"],
             MutationType.MARK_OBJECTIVE_FAILED: ["objective_id"],
             MutationType.MARK_ROOM_VISITED: ["room_id"],
@@ -95,6 +118,16 @@ class ExtractorMutation(BaseModel):
 
 class ExtractorResponse(RootModel[list[ExtractorMutation]]):
     """Strict response contract for the extractor agent."""
+
+
+class IntentResponse(BaseModel):
+    """Strict response contract for the PC/NPC intent generator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intent: str = Field(min_length=1)
+    in_character_note: str = ""
+    reasoning: str = Field(min_length=1)
 
 
 def _extract_json_block(raw_text: str) -> str:
@@ -132,6 +165,19 @@ def parse_extractor_response(raw_text: str) -> ExtractorResponse:
         return ExtractorResponse.model_validate(payload)
     except ValidationError as exc:
         raise ContractParseError(f"Extractor schema validation error: {exc}") from exc
+
+
+def parse_intent_response(raw_text: str) -> IntentResponse:
+    """Parse and validate intent-generator JSON output."""
+    try:
+        payload = json.loads(_extract_json_block(raw_text))
+    except json.JSONDecodeError as exc:
+        raise ContractParseError(f"Intent JSON parse error: {exc}") from exc
+
+    try:
+        return IntentResponse.model_validate(payload)
+    except ValidationError as exc:
+        raise ContractParseError(f"Intent schema validation error: {exc}") from exc
 
 
 def dump_model_json(model: BaseModel | RootModel[Any]) -> str:

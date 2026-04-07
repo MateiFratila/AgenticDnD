@@ -12,8 +12,10 @@ from .state import (
     NPCState,
     RoomState,
     EncounterState,
+    EncounterTurnEntry,
     ObjectiveState,
     AbilityScores,
+    ActorKnowledgeState,
 )
 
 
@@ -138,6 +140,7 @@ class AdventureLoader:
                 hp_current=pc_data["hp"]["current"],
                 ac=pc_data["ac"],
                 position="entrance",  # Default, will be overridden
+                inventory=pc_data.get("inventory", []),
             )
             party[pc.id] = pc
         return party
@@ -160,6 +163,7 @@ class AdventureLoader:
                         ac=enemy.get("ac", 12),
                         position=room_data.get("room_id", "unknown"),
                         role="combatant",
+                        inventory=enemy.get("inventory", []),
                     )
                     npcs[npc_id] = npc
         
@@ -188,6 +192,7 @@ class AdventureLoader:
                 ac=ac,
                 position="unknown",  # Will be placed by DM logic
                 role=npc_data.get("role", "unknown"),
+                inventory=npc_data.get("inventory", []),
             )
             npcs[npc_id] = npc
         
@@ -245,6 +250,8 @@ class AdventureLoader:
                     is_cleared=False,
                     round_count=0,
                     npc_ids=npc_ids,
+                    turn_order=[],
+                    current_turn_index=0,
                 )
                 encounters[enc_id] = encounter_state
         return encounters
@@ -324,6 +331,7 @@ class AdventureLoader:
                 hp_current=pc_data["hp_current"],
                 ac=pc_data["ac"],
                 position=pc_data["position"],
+                inventory=pc_data.get("inventory", []),
                 conditions=pc_data.get("conditions", []),
                 is_alive=pc_data.get("is_alive", True),
             )
@@ -340,6 +348,7 @@ class AdventureLoader:
                 ac=npc_data["ac"],
                 position=npc_data["position"],
                 role=npc_data["role"],
+                inventory=npc_data.get("inventory", []),
                 conditions=npc_data.get("conditions", []),
                 is_alive=npc_data.get("is_alive", True),
                 morale=npc_data.get("morale", 0),
@@ -370,6 +379,14 @@ class AdventureLoader:
                 is_cleared=enc_data.get("is_cleared", False),
                 round_count=enc_data.get("round_count", 0),
                 npc_ids=enc_data.get("npc_ids", []),
+                turn_order=[
+                    EncounterTurnEntry(
+                        actor_id=item["actor_id"],
+                        initiative_roll=item.get("initiative_roll"),
+                    )
+                    for item in enc_data.get("turn_order", [])
+                ],
+                current_turn_index=enc_data.get("current_turn_index", 0),
             )
             for enc_id, enc_data in snapshot_data.get("encounters", {}).items()
         }
@@ -384,6 +401,21 @@ class AdventureLoader:
             for obj_id, obj_data in snapshot_data.get("objectives", {}).items()
         }
 
+        actor_knowledge = {
+            actor_id: ActorKnowledgeState(
+                actor_id=knowledge_data.get("actor_id", actor_id),
+                actor_type=knowledge_data.get(
+                    "actor_type",
+                    "pc" if actor_id in party else "npc",
+                ),
+                known_room_ids=knowledge_data.get("known_room_ids", []),
+                known_npc_ids=knowledge_data.get("known_npc_ids", []),
+                known_pc_ids=knowledge_data.get("known_pc_ids", []),
+                last_seen_room_id=knowledge_data.get("last_seen_room_id"),
+            )
+            for actor_id, knowledge_data in snapshot_data.get("actor_knowledge", {}).items()
+        }
+
         return WorldState(
             adventure_title=snapshot_data.get("adventure_title", "Unknown Adventure"),
             game_session_id=snapshot_data.get("game_session_id") or self._generate_game_session_id(),
@@ -394,6 +426,7 @@ class AdventureLoader:
             encounters=encounters,
             objectives=objectives,
             homebrew_rules=snapshot_data.get("homebrew_rules", {}),
+            actor_knowledge=actor_knowledge,
             active_encounter_id=snapshot_data.get("active_encounter_id"),
             turn_log=snapshot_data.get("turn_log", []),
             active_actor_id=snapshot_data.get("active_actor_id"),

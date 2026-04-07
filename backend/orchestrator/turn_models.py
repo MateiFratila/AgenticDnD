@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 
 class TableStep(str, Enum):
@@ -27,6 +28,29 @@ class TableEvent:
 
 
 @dataclass(frozen=True)
+class ResolvedAction:
+    """Normalized action contract used internally regardless of input source."""
+
+    actor_id: str
+    action: str
+    source: Literal["player", "intent_agent"]
+    in_character_note: str | None = None
+    reasoning: str | None = None
+
+
+@dataclass(frozen=True)
+class NpcTurnSummary:
+    """Compact summary of one auto-resolved NPC turn."""
+
+    actor_id: str
+    generated_action: str
+    status: str
+    ruling: str
+    advanced_turn: bool
+    applied_mutation_count: int
+
+
+@dataclass(frozen=True)
 class TurnResult:
     """Result of one orchestrator turn cycle."""
 
@@ -37,3 +61,6 @@ class TurnResult:
     advanced_turn: bool
     applied_mutation_count: int
     events: list[TableEvent] = field(default_factory=list)
+    generated_action: str | None = None
+    resolved_action: ResolvedAction | None = None
+    npc_turns: list[NpcTurnSummary] = field(default_factory=list)

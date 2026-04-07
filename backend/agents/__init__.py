@@ -7,8 +7,10 @@ from .contracts import (
     DestinationRoute,
     ExtractorMutation,
     ExtractorResponse,
+    IntentResponse,
     parse_adjudicator_response,
     parse_extractor_response,
+    parse_intent_response,
 )
 
 __all__ = [
@@ -18,6 +20,8 @@ __all__ = [
     "DestinationRoute",
     "ExtractorMutation",
     "ExtractorResponse",
+    "IntentResponse",
     "parse_adjudicator_response",
     "parse_extractor_response",
+    "parse_intent_response",
 ]

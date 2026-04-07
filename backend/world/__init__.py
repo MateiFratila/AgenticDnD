@@ -1,5 +1,5 @@
 # World module: deterministic game state and rules
-from .state import WorldState, PCState, NPCState, RoomState, EncounterState
+from .state import WorldState, PCState, NPCState, RoomState, EncounterState, EncounterTurnEntry, ActorKnowledgeState
 from .loader import AdventureLoader
 from .mutations import MutationType, WorldMutation
 from .dispatcher import DispatchError, WorldStateDispatcher
@@ -10,6 +10,8 @@ __all__ = [
     "NPCState",
     "RoomState",
     "EncounterState",
+    "EncounterTurnEntry",
+    "ActorKnowledgeState",
     "AdventureLoader",
     "MutationType",
     "WorldMutation",

@@ -128,8 +128,10 @@ def test_api_advance_approved():
 
         # Post an action
         action_request = {
-            "actor": first_actor,
-            "action": "I attack the nearest enemy",
+            "actor": {
+                "actor_id": first_actor,
+                "action": "I attack the nearest enemy",
+            }
         }
 
         response = client.post("/api/advance", json=action_request)
@@ -139,9 +141,79 @@ def test_api_advance_approved():
         assert data["success"] is True
         assert data["actor_id"] == first_actor
         assert data["data"] is not None
-        assert "status" in data["data"]
-        assert "ruling" in data["data"]
-        assert "awaiting_actor_id" in data["data"]
+        assert data["data"]["actor"]["actor_id"] == first_actor
+        assert data["data"]["actor"]["action"] == "I attack the nearest enemy"
+        assert data["data"]["actor"]["source"] == "player"
+
+def test_api_advance_empty_action_returns_npc_turns(monkeypatch):
+    """POST /api/advance should allow an empty action and surface any auto-resolved NPC turns."""
+    from backend.api import routes
+    from fastapi import FastAPI
+
+    app = FastAPI()
+    from backend.api import router
+
+    app.include_router(router)
+    client = TestClient(app)
+
+    fake_world = SimpleNamespace(
+        active_actor_id="aldric_stonehammer",
+        awaiting_input_from="aldric_stonehammer",
+    )
+    fake_result = SimpleNamespace(
+        status="approved",
+        ruling="Aldric advances under AI control.",
+        actor_id="aldric_stonehammer",
+        awaiting_actor_id="sylara_nightveil",
+        advanced_turn=True,
+        applied_mutation_count=2,
+        generated_action="Aldric raises his shield and steps into the doorway.",
+        resolved_action=SimpleNamespace(
+            actor_id="aldric_stonehammer",
+            action="Aldric raises his shield and steps into the doorway.",
+            source="intent_agent",
+            in_character_note="",
+            reasoning="Test intent output",
+        ),
+        npc_turns=[
+            SimpleNamespace(
+                actor_id="encounter_1_enemy_0",
+                generated_action="The goblin stabs at Aldric.",
+                status="approved",
+                ruling="The goblin lashes out with a rusty spear.",
+                advanced_turn=True,
+                applied_mutation_count=1,
+            )
+        ],
+    )
+
+    class StubOrchestrator:
+        def __init__(self):
+            self.world = fake_world
+            self.received_action = None
+
+        def process_intent(self, action_text: str, actor_id: str | None = None):
+            self.received_action = action_text
+            return fake_result
+
+    stub_orchestrator = StubOrchestrator()
+    monkeypatch.setitem(routes._state, "orchestrator", stub_orchestrator)
+
+    response = client.post(
+        "/api/advance",
+        json={"actor": {"actor_id": "aldric_stonehammer", "action": None}},
+    )
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["data"]["actor"]["actor_id"] == "aldric_stonehammer"
+    assert payload["data"]["actor"]["action"] == "Aldric raises his shield and steps into the doorway."
+    assert payload["data"]["actor"]["source"] == "intent_agent"
+    assert payload["data"]["actor"]["reasoning"] == "Test intent output"
+    assert payload["data"]["npc_turns"][0]["actor_id"] == "encounter_1_enemy_0"
+    assert payload["data"]["npc_turns"][0]["generated_action"] == "The goblin stabs at Aldric."
+    assert stub_orchestrator.received_action == ""
 
 
 def test_api_advance_wrong_actor():
@@ -200,8 +272,10 @@ def test_api_advance_wrong_actor():
 
         # Try to act as wrong actor
         action_request = {
-            "actor": wrong_actor,
-            "action": "I attack the nearest enemy",
+            "actor": {
+                "actor_id": wrong_actor,
+                "action": "I attack the nearest enemy",
+            }
         }
 
         response = client.post("/api/advance", json=action_request)

@@ -46,6 +46,10 @@ async def lifespan(app: FastAPI):
             agent_type="extractor",
             agent_name="Extractor",
         )
+        intent_agent = BaseAgent(
+            agent_type="intent",
+            agent_name="Intent Generator",
+        )
 
         # Create orchestrator from agents
         turn_order = list(world.party.keys())
@@ -54,6 +58,7 @@ async def lifespan(app: FastAPI):
             turn_order=turn_order,
             adjudicator_agent=adjudicator_agent,
             extractor_agent=extractor_agent,
+            intent_agent=intent_agent,
         )
 
         # Register orchestrator with routes
