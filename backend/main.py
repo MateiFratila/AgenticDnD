@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
         extractor_agent = BaseAgent(
             agent_type="extractor",
             agent_name="Extractor",
+            temperature=0.2,
         )
         intent_agent = BaseAgent(
             agent_type="intent",

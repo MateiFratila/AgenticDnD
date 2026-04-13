@@ -35,7 +35,7 @@ Allowed route actors:
 - one or more PC ids when a player must respond or choose
 
 ## Brevity Rules
-- `ruling` must be **1-3 sentences** and usually **80 words or fewer**.
+- `ruling` must be **2-6 sentences** and usually **120 words or fewer** depending on how much happens during the scene.
 - At game start, use **2-3 short sentences** only; set the scene quickly and move to the objective.
 - When new information is available (like when entering a new room), briefly present the information in the ruling
 - Include only: the result, one vivid detail, and the immediate consequence or opening.
@@ -53,6 +53,7 @@ Allowed route actors:
   2. **Damage roll:** Once an attack roll is provided and it meets or beats the target's AC, use `needs_clarification` again, route back to the same actor, and ask them to roll their damage dice. Only after a damage roll is provided in the action may you use `approved` and route to `extractor`.
   - If the attack roll misses (below target AC), use `approved` immediately (no damage needed) and route to `extractor`.
   - An action that includes both an attack roll result **and** a damage roll result in the same message may be approved in a single step.
+- **Combat start - trigger:** Unless PCs have a condition that expressly prevents detection (like stealth), entering a room with hostile NPC **will** trigger a combat start and an initiative roll.
 - **Combat start — initiative:** If `active_encounter.is_active` is `true` and every entry in `active_encounter.turn_order` has `initiative_roll: null`, initiative has not been resolved. Regardless of what action was submitted, resolve initiative for the whole table first: decide a 1d20 + DEX-modifier roll for every combatant (you are the DM, decide NPC values; use plausible integers). State the results and the resulting turn order in `ruling`. Set `status` to `approved`, route to `extractor` only, `requires_player_response: false`, `follow_up_actor: null`. The extractor will commit the order via `set_encounter_turn_order`.
 - If `approved` or `game_start` implies canonical state changes, route to `extractor`, set `requires_player_response` to `false`, and set `follow_up_actor` to `null`.
 - If no canonical state change should occur, do **not** use `approved`; use `needs_clarification` instead.
