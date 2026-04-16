@@ -144,12 +144,7 @@ class WorldStateDispatcher:
             return world.update_pc(mutation.target_id, pc.heal(amount))
         if mutation.target_id in world.npcs:
             npc = world.npcs[mutation.target_id]
-            healed_npc = replace(
-                npc,
-                hp_current=min(npc.hp_max, npc.hp_current + amount),
-                is_alive=True,
-            )
-            return world.update_npc(mutation.target_id, healed_npc)
+            return world.update_npc(mutation.target_id, npc.heal(amount))
 
         raise DispatchError(f"Unknown target id: {mutation.target_id}")
 

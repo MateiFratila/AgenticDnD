@@ -56,14 +56,13 @@
           "id": "encounter_1",
           "name": "Goblin Sentries (easy)",
           "enemies": [
-            {"type": "Goblin", "hp": 7, "ac": 15, "count": 3},
             {"type": "Goblin Boss", "hp": 21, "ac": 16, "count": 1}
           ],
           "treasure": [
-            {"item": "Shortbow (common)", "count": 4},
+            {"item": "Shortbow (common)", "count": 1},
             {"item": "Gold", "amount": 35}
           ],
-          "notes": "Goblins are gambling; startled by intrusion. Boss (Captain Jerk) will try to flee if below 5 HP."
+          "notes": "Goblin is gambling; startled by intrusion. Boss (Captain Jerk) will try to flee if below 5 HP."
         }
       ],
       "hazards": []

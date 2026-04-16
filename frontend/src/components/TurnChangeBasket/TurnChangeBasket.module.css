@@ -1,0 +1,145 @@
+.panel {
+  width: 300px;
+  min-width: 260px;
+  max-width: 340px;
+  background: #0f0f1e;
+  border-left: 1px solid #2e2e4a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid #2e2e4a;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.snapshotTag {
+  font-size: 0.65rem;
+  color: #555;
+  font-family: "Fira Code", "Consolas", monospace;
+  margin-left: auto;
+}
+
+.count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #c0a96e33;
+  color: #c0a96e;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: #444;
+  font-size: 0.8rem;
+}
+
+.emptySub {
+  font-size: 0.7rem;
+  color: #333;
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+.change {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid #1e1e30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.change:last-child {
+  border-bottom: none;
+}
+
+.kind_added {
+  border-left: 2px solid #4ec04e44;
+}
+
+.kind_removed {
+  border-left: 2px solid #c04e4e44;
+}
+
+.kind_changed {
+  border-left: 2px solid transparent;
+}
+
+.path {
+  font-size: 0.7rem;
+  font-family: "Fira Code", "Consolas", monospace;
+  color: #7a85a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.values {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.oldValue {
+  font-size: 0.75rem;
+  color: #c04e4e;
+  text-decoration: line-through;
+  font-family: "Fira Code", "Consolas", monospace;
+  word-break: break-all;
+}
+
+.arrow {
+  font-size: 0.7rem;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.newValue {
+  font-size: 0.75rem;
+  color: #4ec04e;
+  font-family: "Fira Code", "Consolas", monospace;
+  word-break: break-all;
+}
+
+.kindTag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: #1a3a1a;
+  color: #4ec04e;
+  letter-spacing: 0.04em;
+}
+
+.kindRemoved {
+  background: #3a1a1a;
+  color: #c04e4e;
+}

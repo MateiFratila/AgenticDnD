@@ -1,5 +1,6 @@
 """REST API routes for table orchestration."""
 
+import asyncio
 import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, status
@@ -7,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 from backend.agents import BaseAgent
 from backend.api.models import ActionRequest, OutcomeResponse, ActionResponse, ResolvedActionResponse
 from backend.orchestrator.snapshot_store import clear_world_snapshots, list_world_snapshots
-from backend.orchestrator.snapshot_tools import diff_snapshot_files
+from backend.orchestrator.snapshot_tools import diff_snapshot_files, diff_snapshot_files_structured
 from backend.orchestrator.table_orchestrator import TableOrchestrator
 from backend.world import AdventureLoader
 
@@ -240,7 +241,7 @@ async def diff_latest_snapshots(session_id: str | None = None) -> dict:
 
         new_snapshot = snapshots[0]
         old_snapshot = snapshots[1]
-        diffs = diff_snapshot_files(old_snapshot, new_snapshot)
+        diffs = diff_snapshot_files_structured(old_snapshot, new_snapshot)
 
         return {
             "success": True,
@@ -289,7 +290,9 @@ async def advance_game(request: ActionRequest) -> OutcomeResponse:
             )
 
         submitted_action = request_actor.action or ""
-        result = orchestrator.process_intent(submitted_action, actor_id=actor_id)
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: orchestrator.process_intent(submitted_action, actor_id=actor_id)
+        )
 
         resolved_action = getattr(result, "resolved_action", None)
         actor_response = ResolvedActionResponse(

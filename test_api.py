@@ -358,7 +358,7 @@ def test_api_init_resets_and_kicks_off(monkeypatch):
     with TemporaryDirectory() as temp_dir:
         snapshot_dir = Path(temp_dir) / "snapshots"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
-        (snapshot_dir / "session_old_loop_0001_turn_0000_v_0000_actor_init.json").write_text("{}")
+        (snapshot_dir / "s_old_l_0001_a_init.json").write_text("{}")
 
         fake_world = SimpleNamespace(
             game_session_id="abcde",
@@ -402,7 +402,7 @@ def test_api_init_resets_and_kicks_off(monkeypatch):
         assert data["kickoff"]["status"] == "approved"
         assert "Adventure Start" in stub_orchestrator.kickoff_action
 
-        assert not any(snapshot_dir.glob("*loop_*.json"))
+        assert not any(snapshot_dir.glob("s_*_l_*.json"))
 
 
 def test_api_rewind_deletes_latest_snapshot_and_reloads_previous(monkeypatch):
@@ -422,8 +422,8 @@ def test_api_rewind_deletes_latest_snapshot_and_reloads_previous(monkeypatch):
         snapshot_dir = Path(temp_dir) / "snapshots"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-        older_snapshot = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
-        latest_snapshot = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        older_snapshot = snapshot_dir / "s_abcde_l_0001_a_init.json"
+        latest_snapshot = snapshot_dir / "s_abcde_l_0002_a_test.json"
         older_snapshot.write_text("{}", encoding="utf-8")
         latest_snapshot.write_text("{}", encoding="utf-8")
 
@@ -487,8 +487,8 @@ def test_api_snapshot_list_endpoint(monkeypatch):
         snapshot_dir = Path(temp_dir) / "snapshots"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-        first = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
-        second = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        first = snapshot_dir / "s_abcde_l_0001_a_init.json"
+        second = snapshot_dir / "s_abcde_l_0002_a_test.json"
         first.write_text("{}", encoding="utf-8")
         second.write_text("{}", encoding="utf-8")
 
@@ -522,8 +522,8 @@ def test_api_snapshot_diff_latest_endpoint(monkeypatch):
         snapshot_dir = Path(temp_dir) / "snapshots"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-        older = snapshot_dir / "session_abcde_loop_0001_turn_0000_v_0000_actor_init.json"
-        newer = snapshot_dir / "session_abcde_loop_0002_turn_0001_v_0001_actor_test.json"
+        older = snapshot_dir / "s_abcde_l_0001_a_init.json"
+        newer = snapshot_dir / "s_abcde_l_0002_a_test.json"
         older.write_text(json.dumps({"turn_count": 0}), encoding="utf-8")
         newer.write_text(json.dumps({"turn_count": 1}), encoding="utf-8")
 

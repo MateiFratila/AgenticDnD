@@ -276,11 +276,9 @@ class AdventureLoader:
         """Persist world state to the snapshot directory and return the path."""
         self.snapshot_dir.mkdir(parents=True, exist_ok=True)
         file_path = self.snapshot_dir / (
-            f"session_{world.game_session_id}_"
-            f"loop_0001_"
-            f"turn_{world.turn_count:04d}_"
-            f"v_{world.world_version:04d}_"
-            f"actor_{actor_id}.json"
+            f"s_{world.game_session_id}_"
+            "l_0001_"
+            f"a_{actor_id}.json"
         )
         file_path.write_text(json.dumps(asdict(world), indent=2), encoding="utf-8")
         return file_path
@@ -295,7 +293,10 @@ class AdventureLoader:
             return None
 
         snapshot_files = sorted(
-            self.snapshot_dir.glob("*loop_*.json"),
+            [
+                *self.snapshot_dir.glob("s_*_l_*.json"),
+                *self.snapshot_dir.glob("session_*_loop_*.json"),
+            ],
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )

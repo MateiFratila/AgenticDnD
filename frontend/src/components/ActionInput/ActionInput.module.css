@@ -1,0 +1,143 @@
+.form {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #2e2e4a;
+  background: #13132a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.labelLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.label strong {
+  color: #4a9eff;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a9eff;
+  animation: pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.input {
+  flex: 1;
+  background: #1a1a30;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  color: #ddd;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.7rem;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.45;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #4a9eff66;
+}
+
+.input:disabled {
+  opacity: 0.5;
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.btnSubmit,
+.btnAuto,
+.btnAutopilot {
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.7rem;
+  transition: opacity 0.15s;
+}
+
+.btnSubmit:disabled,
+.btnAuto:disabled,
+.btnAutopilot:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnSubmit {
+  background: #4a9eff;
+  color: #fff;
+}
+
+.btnSubmit:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.btnAuto {
+  background: transparent;
+  color: #4a9eff;
+  border: 1px solid #4a9eff44;
+}
+
+.btnAuto:not(:disabled):hover {
+  background: #4a9eff22;
+}
+
+.btnAutopilot {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  background: transparent;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.btnAutopilot:not(:disabled):hover {
+  border-color: #4a9eff44;
+  color: #4a9eff;
+}
+
+.btnAutopilotOn {
+  border-color: #4a9eff66;
+  color: #4a9eff;
+  background: #4a9eff11;
+}
+
+.btnAutopilotOn:not(:disabled):hover {
+  background: #4a9eff22;
+}

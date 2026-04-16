@@ -13,6 +13,13 @@ from backend.world import WorldState
 logger = logging.getLogger(__name__)
 
 
+def _snapshot_patterns(session_id: str | None) -> tuple[str, str]:
+    """Return compact and legacy snapshot filename globs for the optional session."""
+    if session_id is None:
+        return "s_*_l_*.json", "session_*_loop_*.json"
+    return f"s_{session_id}_l_*.json", f"session_{session_id}_loop_*.json"
+
+
 def list_world_snapshots(
     snapshot_dir: str | Path = "artifacts/world_snapshots",
     session_id: str | None = None,
@@ -23,8 +30,9 @@ def list_world_snapshots(
     if not base_dir.exists():
         return []
 
-    pattern = f"session_{session_id}_loop_*.json" if session_id else "*loop_*.json"
-    snapshots = list(base_dir.glob(pattern))
+    compact_pattern, legacy_pattern = _snapshot_patterns(session_id)
+    snapshots = [*base_dir.glob(compact_pattern), *base_dir.glob(legacy_pattern)]
+    snapshots = list(dict.fromkeys(snapshots))
 
     if newest_first:
         return sorted(snapshots, key=lambda path: path.stat().st_mtime, reverse=True)
@@ -55,13 +63,20 @@ def next_loop_index(
     if not base_dir.exists():
         return 1
 
-    prefix = f"session_{game_session_id}_loop_"
+    compact_prefix = f"s_{game_session_id}_l_"
+    legacy_prefix = f"session_{game_session_id}_loop_"
     max_loop = 0
-    for snapshot_path in base_dir.glob(f"session_{game_session_id}_loop_*.json"):
+    for snapshot_path in [
+        *base_dir.glob(f"s_{game_session_id}_l_*.json"),
+        *base_dir.glob(f"session_{game_session_id}_loop_*.json"),
+    ]:
         name = snapshot_path.name
-        if not name.startswith(prefix):
+        if name.startswith(compact_prefix):
+            loop_token = name[len(compact_prefix): len(compact_prefix) + 4]
+        elif name.startswith(legacy_prefix):
+            loop_token = name[len(legacy_prefix): len(legacy_prefix) + 4]
+        else:
             continue
-        loop_token = name[len(prefix): len(prefix) + 4]
         if loop_token.isdigit():
             max_loop = max(max_loop, int(loop_token))
 
@@ -83,11 +98,9 @@ def persist_world_snapshot(
 
     resolved_loop_index = loop_index or next_loop_index(base_dir, world.game_session_id)
     file_path = base_dir / (
-        f"session_{world.game_session_id}_"
-        f"loop_{resolved_loop_index:04d}_"
-        f"turn_{world.turn_count:04d}_"
-        f"v_{world.world_version:04d}_"
-        f"actor_{actor_id}.json"
+        f"s_{world.game_session_id}_"
+        f"l_{resolved_loop_index:04d}_"
+        f"a_{actor_id}.json"
     )
     file_path.write_text(json.dumps(asdict(world), indent=2), encoding="utf-8")
     logger.info("[TABLE] Snapshot persisted | path=%s", file_path)

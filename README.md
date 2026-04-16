@@ -90,7 +90,7 @@ What it does:
 Snapshot behavior:
 - Default output directory: `artifacts/world_snapshots/`
 - Snapshot naming:
-  `session_<game_session_id>_loop_XXXX_turn_XXXX_v_XXXX_actor_<actor_id>.json`
+  `s_<game_session_id>_l_XXXX_a_<actor_id>.json`
 - Disable snapshots by passing `snapshot_dir=None` when creating the orchestrator.
 
 ### Snapshot Tools
@@ -98,7 +98,7 @@ Snapshot behavior:
 File: `backend/orchestrator/snapshot_tools.py`
 
 What it does:
-- Lists snapshot files (`*loop_*.json`, including session-prefixed names).
+- Lists snapshot files (`s_*_l_*.json`).
 - Loads snapshot JSON.
 - Produces readable flattened diffs between snapshots.
 - Supports automatic latest-to-latest diff with `diff-latest`.

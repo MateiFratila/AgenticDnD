@@ -12,7 +12,7 @@
 
 
 - WorldState also carries session metadata: game_session_id (5-char id), active_actor_id, awaiting_input_from, world_version. This metadata is treated as part of the source of truth, not transient orchestrator-only state.
-- Snapshot persistence is enabled by default in TableOrchestrator. Final world state is written after each loop to artifacts/world_snapshots/ using session-prefixed filenames: session_<game_session_id>_loop_<n>_turn_<n>_v_<n>_actor_<actor>.json.
+- Snapshot persistence is enabled by default in TableOrchestrator. Final world state is written after each loop to artifacts/world_snapshots/ using compact session-prefixed filenames: s_<game_session_id>_l_<n>_a_<actor>.json.
 - AdventureLoader is snapshot-first. load_adventure() restores latest matching snapshot first; if none exists, it builds a fresh world from assets/ and assigns a new 5-char game_session_id.
 - Fresh-world bootstrap detail: AdventureLoader now persists an initial snapshot immediately after building a new WorldState. This prevents generated game_session_id values from being lost before the first TableOrchestrator turn writes a snapshot.
 - Loader restore nuance: _load_world_from_snapshot() still falls back to generating a new game_session_id when reading older/legacy snapshots that do not contain that field.

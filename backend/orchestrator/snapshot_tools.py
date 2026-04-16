@@ -71,6 +71,38 @@ def diff_snapshot_files(old_path: str | Path, new_path: str | Path) -> list[str]
     return diff_snapshot_dicts(old_snapshot, new_snapshot)
 
 
+def diff_snapshot_files_structured(
+    old_path: str | Path, new_path: str | Path
+) -> list[dict[str, Any]]:
+    """Return diffs as structured records suitable for JSON serialization.
+
+    Each record has:
+      - path: dot-notation field path
+      - kind: "added" | "removed" | "changed"
+      - old_value: previous value (None for added)
+      - new_value: new value (None for removed)
+    """
+    old_flat = _flatten_json(load_snapshot(old_path))
+    new_flat = _flatten_json(load_snapshot(new_path))
+
+    old_keys = set(old_flat.keys())
+    new_keys = set(new_flat.keys())
+
+    records: list[dict[str, Any]] = []
+
+    for key in sorted(old_keys - new_keys):
+        records.append({"path": key, "kind": "removed", "old_value": old_flat[key], "new_value": None})
+
+    for key in sorted(new_keys - old_keys):
+        records.append({"path": key, "kind": "added", "old_value": None, "new_value": new_flat[key]})
+
+    for key in sorted(old_keys & new_keys):
+        if old_flat[key] != new_flat[key]:
+            records.append({"path": key, "kind": "changed", "old_value": old_flat[key], "new_value": new_flat[key]})
+
+    return records
+
+
 def _build_parser() -> ArgumentParser:
     parser = ArgumentParser(description="Snapshot list and diff utilities")
     subparsers = parser.add_subparsers(dest="command", required=True)

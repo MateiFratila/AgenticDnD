@@ -1,0 +1,79 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #1a1a2e;
+  border-bottom: 1px solid #2e2e4a;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brandIcon {
+  font-size: 1.25rem;
+}
+
+.brandName {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #c0a96e;
+  letter-spacing: 0.04em;
+}
+
+.sessionId {
+  flex: 1;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.sessionId code {
+  color: #888;
+  font-family: "Fira Code", "Consolas", monospace;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.btnPrimary,
+.btnSecondary {
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btnPrimary:disabled,
+.btnSecondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: #c0a96e;
+  color: #1a1a2e;
+}
+
+.btnPrimary:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.btnSecondary {
+  background: transparent;
+  color: #c0a96e;
+  border: 1px solid #c0a96e44;
+}
+
+.btnSecondary:not(:disabled):hover {
+  background: #c0a96e22;
+}

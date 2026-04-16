@@ -74,7 +74,7 @@ class PCState:
     def heal(self, amount: int) -> "PCState":
         """Apply healing. Returns updated PCState."""
         new_hp = min(self.hp_max, self.hp_current + amount)
-        return replace(self, hp_current=new_hp)
+        return replace(self, hp_current=new_hp, is_alive=new_hp > 0)
 
     def move_to(self, room_id: str) -> "PCState":
         """Move to a room. Returns updated PCState."""
@@ -131,6 +131,11 @@ class NPCState:
         new_hp = max(0, self.hp_current - amount)
         is_alive = new_hp > 0
         return replace(self, hp_current=new_hp, is_alive=is_alive)
+
+    def heal(self, amount: int) -> "NPCState":
+        """Apply healing. Returns updated NPCState."""
+        new_hp = min(self.hp_max, self.hp_current + amount)
+        return replace(self, hp_current=new_hp, is_alive=new_hp > 0)
 
     def set_morale(self, morale: int) -> "NPCState":
         """Set morale (-2 to 2). Returns updated NPCState."""

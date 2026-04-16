@@ -328,8 +328,8 @@ def test_loader_restore_snapshot_or_initialize_new():
         )
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         snapshot_path = snapshot_dir / (
-            f"session_{restored_seed.game_session_id}_"
-            "loop_0001_turn_0001_v_0001_actor_test.json"
+            f"s_{restored_seed.game_session_id}_"
+            "l_0001_a_test.json"
         )
         snapshot_path.write_text(json.dumps(asdict(restored_seed), indent=2), encoding="utf-8")
 

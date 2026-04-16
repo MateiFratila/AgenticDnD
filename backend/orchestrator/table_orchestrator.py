@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -65,6 +66,7 @@ class TableOrchestrator:
         snapshot_dir: str | Path | None = "artifacts/world_snapshots",
         max_auto_npc_turns: int = 12,
         max_npc_follow_up_passes: int = 3,
+        npc_turn_delay: float = 0.5,
     ):
         if not turn_order:
             raise ValueError("turn_order must contain at least one actor id")
@@ -80,6 +82,7 @@ class TableOrchestrator:
         self.current_step = TableStep.WAITING_FOR_INTENT
         self.max_auto_npc_turns = max(1, max_auto_npc_turns)
         self.max_npc_follow_up_passes = max(1, max_npc_follow_up_passes)
+        self.npc_turn_delay = max(0.0, npc_turn_delay)
         self.world = world
         self._sync_active_encounter_turn_order()
 
@@ -105,6 +108,7 @@ class TableOrchestrator:
         snapshot_dir: str | Path | None = "artifacts/world_snapshots",
         max_auto_npc_turns: int = 12,
         max_npc_follow_up_passes: int = 3,
+        npc_turn_delay: float = 0.5,
     ) -> "TableOrchestrator":
         """Create orchestrator using agent wrappers instead of raw callback functions."""
         orchestrator: TableOrchestrator | None = None
@@ -153,6 +157,7 @@ class TableOrchestrator:
             snapshot_dir=snapshot_dir,
             max_auto_npc_turns=max_auto_npc_turns,
             max_npc_follow_up_passes=max_npc_follow_up_passes,
+            npc_turn_delay=npc_turn_delay,
         )
         return orchestrator
 
@@ -570,6 +575,9 @@ class TableOrchestrator:
 
             if turn_result is None:
                 break
+
+            if self.npc_turn_delay > 0 and self.current_actor_id in self.world.npcs:
+                time.sleep(self.npc_turn_delay)
 
             npc_turns.append(
                 NpcTurnSummary(

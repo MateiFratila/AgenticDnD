@@ -15,8 +15,8 @@ def test_list_snapshot_files_sorted(tmp_path: Path):
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     names = [
-        "loop_0002_turn_0001_v_0001_actor_a.json",
-        "loop_0001_turn_0000_v_0000_actor_a.json",
+        "s_test_l_0002_a_a.json",
+        "s_test_l_0001_a_a.json",
     ]
 
     for name in names:
@@ -57,8 +57,8 @@ def test_diff_latest_command(tmp_path: Path, monkeypatch, capsys):
     snapshot_dir = tmp_path / "snaps"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-    first = snapshot_dir / "loop_0001_turn_0000_v_0000_actor_a.json"
-    second = snapshot_dir / "loop_0002_turn_0001_v_0001_actor_b.json"
+    first = snapshot_dir / "s_test_l_0001_a_a.json"
+    second = snapshot_dir / "s_test_l_0002_a_b.json"
 
     first.write_text(json.dumps({"turn_count": 0}), encoding="utf-8")
     second.write_text(json.dumps({"turn_count": 1}), encoding="utf-8")
@@ -85,7 +85,7 @@ def test_diff_latest_requires_two_snapshots(tmp_path: Path, monkeypatch, capsys)
     snapshot_dir = tmp_path / "snaps"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-    only = snapshot_dir / "loop_0001_turn_0000_v_0000_actor_a.json"
+    only = snapshot_dir / "s_test_l_0001_a_a.json"
     only.write_text(json.dumps({"turn_count": 0}), encoding="utf-8")
 
     monkeypatch.setattr(
