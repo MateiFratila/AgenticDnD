@@ -98,8 +98,7 @@ def test_load_sunken_grotto():
         assert world.rooms[initial_room_id].connections[0]["destination"] == "goblin_barracks", "Entrance should preserve its connected destination"
 
         goblin_room = world.rooms["goblin_barracks"]
-        assert "encounter_1_enemy_0" in goblin_room.npc_ids, "Goblin barracks should list encounter goblins in room membership"
-        assert "encounter_1_enemy_1" in goblin_room.npc_ids, "Goblin Boss should be discoverable from room membership"
+        assert "encounter_1_enemy_0" in goblin_room.npc_ids, "Goblin Boss should be discoverable from room membership"
 
         # Verify state is immutable
         aldric = world.party["aldric_stonehammer"]

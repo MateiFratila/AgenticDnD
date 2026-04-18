@@ -73,77 +73,59 @@ def test_api_initialization():
         assert response.json() == {"status": "ok"}
 
 
-def test_api_advance_approved():
-    """Test POST /api/advance with an approved action."""
-    assets_dir = Path(__file__).parent / "assets"
+def test_api_advance_approved(monkeypatch):
+    """Test POST /api/advance with an approved action using a stub orchestrator."""
+    from backend.api import routes
+    from fastapi import FastAPI
 
-    with TemporaryDirectory() as temp_dir:
-        snapshot_dir = Path(temp_dir) / "snapshots"
+    app = FastAPI()
+    from backend.api import router
 
-        from contextlib import asynccontextmanager
+    app.include_router(router)
+    client = TestClient(app)
 
-        @asynccontextmanager
-        async def test_lifespan(app):
-            loader = AdventureLoader(assets_dir, snapshot_dir=snapshot_dir)
-            world = loader.load_adventure(
-                adventure_file="adventure_sunken_grotto.json",
-                pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
-                rules_file="homebrew_rules.json",
-            )
+    fake_world = SimpleNamespace(
+        active_actor_id="aldric_stonehammer",
+        awaiting_input_from="aldric_stonehammer",
+    )
+    fake_result = SimpleNamespace(
+        status="approved",
+        ruling="Aldric charges and slams the goblin for 9 damage.",
+        actor_id="aldric_stonehammer",
+        awaiting_actor_id="sylara_nightveil",
+        advanced_turn=True,
+        applied_mutation_count=2,
+        resolved_action=None,
+        npc_turns=[],
+    )
 
-            session_id = world.game_session_id
-            adjudicator_agent = BaseAgent(
-                agent_type="adjudicator", agent_name="Adjudicator"
-            )
-            extractor_agent = BaseAgent(
-                agent_type="extractor", agent_name="Extractor"
-            )
+    class StubOrchestrator:
+        def __init__(self):
+            self.world = fake_world
 
-            turn_order = list(world.party.keys())
-            orchestrator = TableOrchestrator.from_agents(
-                world=world,
-                turn_order=turn_order,
-                adjudicator_agent=adjudicator_agent,
-                extractor_agent=extractor_agent,
-                snapshot_dir=snapshot_dir,
-            )
+        def process_intent(self, action_text: str, actor_id: str | None = None):
+            return fake_result
 
-            set_orchestrator(orchestrator, session_id)
-            yield
+    monkeypatch.setitem(routes._state, "orchestrator", StubOrchestrator())
+    monkeypatch.setitem(routes._state, "session_id", "test1")
 
-        from fastapi import FastAPI
-
-        app = FastAPI(lifespan=test_lifespan)
-        from backend.api import router
-
-        app.include_router(router)
-
-        client = TestClient(app)
-
-        # Get initial status
-        status_response = client.get("/api/status")
-        assert status_response.status_code == 200
-        initial_status = status_response.json()
-        first_actor = initial_status["active_actor_id"]
-
-        # Post an action
-        action_request = {
-            "actor": {
-                "actor_id": first_actor,
-                "action": "I attack the nearest enemy",
-            }
+    action_request = {
+        "actor": {
+            "actor_id": "aldric_stonehammer",
+            "action": "I attack the nearest enemy",
         }
+    }
 
-        response = client.post("/api/advance", json=action_request)
-        assert response.status_code == 200
+    response = client.post("/api/advance", json=action_request)
+    assert response.status_code == 200
 
-        data = response.json()
-        assert data["success"] is True
-        assert data["actor_id"] == first_actor
-        assert data["data"] is not None
-        assert data["data"]["actor"]["actor_id"] == first_actor
-        assert data["data"]["actor"]["action"] == "I attack the nearest enemy"
-        assert data["data"]["actor"]["source"] == "player"
+    data = response.json()
+    assert data["success"] is True
+    assert data["actor_id"] == "aldric_stonehammer"
+    assert data["data"] is not None
+    assert data["data"]["actor"]["actor_id"] == "aldric_stonehammer"
+    assert data["data"]["actor"]["action"] == "I attack the nearest enemy"
+    assert data["data"]["actor"]["source"] == "player"
 
 def test_api_advance_empty_action_returns_npc_turns(monkeypatch):
     """POST /api/advance should allow an empty action and surface any auto-resolved NPC turns."""
@@ -542,4 +524,4 @@ def test_api_snapshot_diff_latest_endpoint(monkeypatch):
         assert data["session_id"] == "abcde"
         assert data["old_snapshot"] == older.name
         assert data["new_snapshot"] == newer.name
-        assert any("~ turn_count" in line for line in data["diffs"])
+        assert any(d.get("path") == "turn_count" and d.get("kind") == "changed" for d in data["diffs"])

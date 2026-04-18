@@ -52,7 +52,7 @@ def test_adjudicator_payload_is_scoped_and_relevant():
     assert "canonical_world_state" in ws
     assert "party" in ws["canonical_world_state"]
     assert "npcs" in ws["canonical_world_state"]
-    assert "rooms" in ws["canonical_world_state"]
+    assert "rooms_of_interest" in ws["canonical_world_state"]
     assert "encounters" in ws["canonical_world_state"]
     assert "objectives" in ws["canonical_world_state"]
     assert ws["canonical_world_state"]["objectives"]["primary"]["goal"] == "Recover the Shard of Kaelas"
@@ -98,8 +98,8 @@ def test_extractor_payload_contains_resolvable_npc_context():
     ws = payload["world_state"]
 
     assert "npcs_of_interest" in ws
-    assert "encounter_1_enemy_1" in ws["npcs_of_interest"]
-    assert ws["npcs_of_interest"]["encounter_1_enemy_1"]["name"] == "Goblin Boss"
+    assert "encounter_1_enemy_0" in ws["npcs_of_interest"]
+    assert ws["npcs_of_interest"]["encounter_1_enemy_0"]["name"] == "Goblin Boss"
 
 
 def test_intent_payload_uses_actor_knowledge_instead_of_remote_omniscience():

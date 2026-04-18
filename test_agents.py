@@ -22,8 +22,8 @@ def test_prompt_loader():
     assert "ruling" in adjudicator_prompt.lower(), "Adjudicator prompt missing expected content"
     assert "destination" in adjudicator_prompt.lower(), "Adjudicator prompt missing routing contract"
     assert "game_start" in adjudicator_prompt, "Adjudicator prompt should preserve the game_start status"
-    assert "1-3 sentences" in adjudicator_prompt, "Adjudicator prompt should enforce concise rulings"
-    assert "80 words" in adjudicator_prompt, "Adjudicator prompt should cap narrative length"
+    assert "2-6 sentences" in adjudicator_prompt, "Adjudicator prompt should enforce concise rulings"
+    assert "120 words" in adjudicator_prompt, "Adjudicator prompt should cap narrative length"
     print(f"✓ Adjudicator system prompt loaded: {len(adjudicator_prompt)} chars")
 
     # Load extractor system prompt

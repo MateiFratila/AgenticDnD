@@ -281,15 +281,15 @@ def test_orchestrator_approved_damage_roll_reasoning_still_commits_extractor_mut
         def approved_damage_roll_adjudicator(world, actor_id: str, action_text: str) -> AdjudicatorResponse:
             return AdjudicatorResponse(
                 status="approved",
-                ruling="Aldric's warhammer caves in the goblin scout's chest and drops it on the spot.",
+                ruling="Aldric's warhammer caves in the Goblin Boss's skull and drops it on the spot.",
                 destination=[
                     DestinationRoute(
                         actor="extractor",
                         purpose="Commit the killing blow to the world state",
-                        payload_hint="Apply the 9 damage and mark the goblin dead",
+                        payload_hint="Apply the 21 damage and mark the goblin dead",
                     )
                 ],
-                reasoning="Damage roll of 9 exceeds the goblin scout's 7 HP, so the approved hit should now resolve canonically.",
+                reasoning="Damage roll of 21 equals the Goblin Boss's 21 HP, so the approved hit should now resolve canonically.",
                 requires_player_response=False,
                 follow_up_actor=None,
                 suggested_alternatives=[],
@@ -301,11 +301,11 @@ def test_orchestrator_approved_damage_roll_reasoning_still_commits_extractor_mut
                     ExtractorMutation(
                         type="apply_damage",
                         target_id="encounter_1_enemy_0",
-                        amount=9,
+                        amount=21,
                     ),
                     ExtractorMutation(
                         type="append_log_entry",
-                        entry="[WORLD] Aldric drops the goblin scout with a crushing warhammer hit.",
+                        entry="[WORLD] Aldric drops the Goblin Boss with a crushing warhammer hit.",
                     ),
                 ]
             )
@@ -341,8 +341,8 @@ def test_orchestrator_can_mark_dead_npc_as_looted():
             pc_files=["pc_aldric_stonehammer.json", "pc_sylara_nightveil.json"],
             rules_file="homebrew_rules.json",
         )
-        dead_boss = world.npcs["encounter_1_enemy_1"].take_damage(world.npcs["encounter_1_enemy_1"].hp_current)
-        world = world.update_npc("encounter_1_enemy_1", dead_boss)
+        dead_boss = world.npcs["encounter_1_enemy_0"].take_damage(world.npcs["encounter_1_enemy_0"].hp_current)
+        world = world.update_npc("encounter_1_enemy_0", dead_boss)
 
         def loot_corpse_adjudicator(world, actor_id: str, action_text: str) -> AdjudicatorResponse:
             return AdjudicatorResponse(
@@ -374,7 +374,7 @@ def test_orchestrator_can_mark_dead_npc_as_looted():
                     ),
                     ExtractorMutation(
                         type="add_condition",
-                        target_id="encounter_1_enemy_1",
+                        target_id="encounter_1_enemy_0",
                         condition="looted",
                     ),
                     ExtractorMutation(
@@ -394,7 +394,7 @@ def test_orchestrator_can_mark_dead_npc_as_looted():
 
         result = table.process_intent("I search the Goblin Boss's corpse.")
 
-    boss = table.world.npcs["encounter_1_enemy_1"]
+    boss = table.world.npcs["encounter_1_enemy_0"]
     sylara = table.world.party["sylara_nightveil"]
     assert result.status == "approved"
     assert "Bronze key" in sylara.inventory
@@ -622,7 +622,7 @@ def test_orchestrator_encounter_turn_wraps_and_increments_round_count():
 
         table = TableOrchestrator.from_agents(
             world=world,
-            turn_order=["aldric_stonehammer", "sylara_nightveil"],
+            turn_order=["aldric_stonehammer"],
             adjudicator_agent=FakeAdjudicatorAgent(),
             extractor_agent=FakeExtractorAgent(),
             intent_agent=FakeIntentAgent(),
